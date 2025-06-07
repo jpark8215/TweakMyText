@@ -1,5 +1,54 @@
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
 
+// Analyze writing samples to determine tone characteristics
+export const analyzeToneFromSamples = (samples: WritingSample[]): ToneSettings => {
+  if (samples.length === 0) {
+    return { formality: 50, casualness: 50, enthusiasm: 50, technicality: 50 };
+  }
+
+  const allText = samples.map(s => s.content).join(' ').toLowerCase();
+  const words = allText.split(/\s+/);
+  const sentences = allText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  
+  // Analyze formality (0-100, higher = more formal)
+  const formalWords = ['however', 'furthermore', 'therefore', 'consequently', 'nevertheless', 'moreover', 'thus', 'hence', 'accordingly', 'subsequently'];
+  const casualWords = ['gonna', 'wanna', 'kinda', 'sorta', 'yeah', 'nah', 'ok', 'cool', 'awesome', 'stuff'];
+  
+  const formalCount = formalWords.reduce((count, word) => count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+  const casualCount = casualWords.reduce((count, word) => count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+  
+  const formality = Math.min(100, Math.max(0, 50 + (formalCount - casualCount) * 10));
+
+  // Analyze conversational tone (0-100, higher = more conversational)
+  const conversationalIndicators = ['i think', 'i believe', 'you know', 'honestly', 'basically', 'literally', 'actually', 'really'];
+  const conversationalCount = conversationalIndicators.reduce((count, phrase) => count + (allText.match(new RegExp(phrase, 'g')) || []).length, 0);
+  const questionCount = (allText.match(/\?/g) || []).length;
+  
+  const casualness = Math.min(100, Math.max(0, 30 + conversationalCount * 15 + questionCount * 10));
+
+  // Analyze enthusiasm (0-100, higher = more enthusiastic)
+  const exclamationCount = (allText.match(/!/g) || []).length;
+  const enthusiasticWords = ['amazing', 'awesome', 'fantastic', 'incredible', 'wonderful', 'brilliant', 'excellent', 'perfect', 'love', 'excited'];
+  const enthusiasticCount = enthusiasticWords.reduce((count, word) => count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+  
+  const enthusiasm = Math.min(100, Math.max(0, 30 + exclamationCount * 8 + enthusiasticCount * 12));
+
+  // Analyze technical complexity (0-100, higher = more technical)
+  const avgWordLength = words.reduce((sum, word) => sum + word.length, 0) / words.length;
+  const longWords = words.filter(word => word.length > 8).length;
+  const technicalWords = ['implementation', 'methodology', 'optimization', 'configuration', 'architecture', 'infrastructure', 'algorithm', 'framework', 'protocol', 'specification'];
+  const technicalCount = technicalWords.reduce((count, word) => count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+  
+  const technicality = Math.min(100, Math.max(0, 20 + (avgWordLength - 4) * 8 + longWords * 2 + technicalCount * 15));
+
+  return {
+    formality: Math.round(formality),
+    casualness: Math.round(casualness),
+    enthusiasm: Math.round(enthusiasm),
+    technicality: Math.round(technicality)
+  };
+};
+
 // Mock LLM integration - in production, this would call your AI service
 export const analyzeWritingStyle = (samples: WritingSample[]): string[] => {
   const allText = samples.map(s => s.content).join(' ').toLowerCase();

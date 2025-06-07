@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Send, Loader2, Sliders, Copy, Download, RefreshCw } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
-import { rewriteText } from '../utils/styleAnalyzer';
+import { rewriteText, analyzeToneFromSamples } from '../utils/styleAnalyzer';
 import ToneControls from './ToneControls';
 import ComparisonView from './ComparisonView';
 
@@ -21,6 +21,14 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     enthusiasm: 50,
     technicality: 50
   });
+
+  // Analyze samples and set initial tone settings when component mounts or samples change
+  useEffect(() => {
+    if (samples.length > 0) {
+      const analyzedTone = analyzeToneFromSamples(samples);
+      setToneSettings(analyzedTone);
+    }
+  }, [samples]);
 
   const handleRewrite = async () => {
     if (!inputText.trim()) return;
