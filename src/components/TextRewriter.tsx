@@ -70,24 +70,26 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 mb-8 sm:mb-10">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-3 px-4 py-2 text-gray-300 hover:text-white transition-colors hover:bg-white/10 rounded-xl"
+          className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 text-gray-300 hover:text-white transition-colors hover:bg-white/10 rounded-lg sm:rounded-xl text-sm sm:text-base"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           Back to Samples
         </button>
-        <div className="text-center">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent mb-2">
+        
+        <div className="text-center flex-1">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent mb-1 sm:mb-2">
             Style Rewriter
           </h1>
-          <p className="text-gray-300 text-lg">Transform any text to match your writing style</p>
+          <p className="text-gray-300 text-sm sm:text-base lg:text-lg">Transform any text to match your writing style</p>
         </div>
+        
         <button
           onClick={() => setShowToneControls(!showToneControls)}
-          className="inline-flex items-center gap-3 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all backdrop-blur-sm border border-white/20"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg sm:rounded-xl transition-all backdrop-blur-sm border border-white/20 text-sm sm:text-base"
         >
           <Sliders className="w-4 h-4" />
           Tone Controls
@@ -96,7 +98,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
 
       {/* Tone Controls */}
       {showToneControls && (
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <ToneControls
             settings={toneSettings}
             onChange={setToneSettings}
@@ -106,32 +108,32 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       )}
 
       {/* Input Section */}
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-8 shadow-xl mb-8">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-xl flex items-center justify-center">
-            <Send className="w-5 h-5 text-white" />
+      <div className="bg-white/10 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-white/20 p-6 sm:p-8 shadow-xl mb-6 sm:mb-8">
+        <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-lg sm:rounded-xl flex items-center justify-center">
+            <Send className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
-          <h3 className="text-xl font-semibold text-white">Input Text</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-white">Input Text</h3>
         </div>
         
         <textarea
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder="Paste the text you want to rewrite in your style..."
-          rows={6}
-          className="w-full px-6 py-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all resize-none backdrop-blur-sm"
+          rows={5}
+          className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base"
         />
         
-        <div className="flex items-center justify-between mt-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-6 mt-4 sm:mt-6">
           <span className="text-sm text-gray-400">
             {inputText.split(' ').filter(w => w.trim()).length} words
           </span>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
             {result && (
               <button
                 onClick={handleRewrite}
                 disabled={isRewriting}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-xl transition-colors border border-white/20"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg sm:rounded-xl transition-colors border border-white/20 text-sm sm:text-base"
               >
                 <RefreshCw className="w-4 h-4" />
                 Rewrite Again
@@ -140,16 +142,16 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             <button
               onClick={handleRewrite}
               disabled={!inputText.trim() || isRewriting}
-              className="inline-flex items-center gap-3 px-8 py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25 text-sm sm:text-base"
             >
               {isRewriting ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                   Rewriting...
                 </>
               ) : (
                 <>
-                  <Send className="w-5 h-5" />
+                  <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                   Rewrite Text
                 </>
               )}
@@ -160,21 +162,21 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
 
       {/* Results Section */}
       {result && (
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
           <ComparisonView result={result} />
           
           {/* Action Buttons */}
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <button
               onClick={() => handleCopy(result.rewritten)}
-              className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:from-emerald-600 hover:to-teal-600 transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/25"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-emerald-600 hover:to-teal-600 transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/25 text-sm sm:text-base"
             >
               <Copy className="w-4 h-4" />
               Copy Rewritten
             </button>
             <button
               onClick={handleExport}
-              className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
             >
               <Download className="w-4 h-4" />
               Export Results
