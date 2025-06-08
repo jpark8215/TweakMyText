@@ -1,4 +1,5 @@
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
+import { rewriteWithClaude } from './claudeApi';
 
 // Analyze writing samples to determine tone characteristics
 export const analyzeToneFromSamples = (samples: WritingSample[]): ToneSettings => {
@@ -82,12 +83,23 @@ export const rewriteText = async (
   samples: WritingSample[],
   toneSettings: ToneSettings
 ): Promise<RewriteResult> => {
-  // Simulate API delay
+  // Check if Claude API key is available
+  const apiKey = import.meta.env.VITE_CLAUDE_API_KEY;
+  
+  if (apiKey) {
+    try {
+      return await rewriteWithClaude(originalText, samples, toneSettings, apiKey);
+    } catch (error) {
+      console.error('Claude API failed, falling back to mock:', error);
+    }
+  }
+
+  // Fallback to mock implementation
   await new Promise(resolve => setTimeout(resolve, 2000));
 
   const styleTags = analyzeWritingStyle(samples);
   
-  // Mock rewriting logic - in production, this would use actual LLM
+  // Mock rewriting logic
   let rewritten = originalText;
   
   // Apply style transformations based on samples and tone settings

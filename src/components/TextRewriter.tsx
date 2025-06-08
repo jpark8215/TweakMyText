@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
 import { rewriteText, analyzeToneFromSamples } from '../utils/styleAnalyzer';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 import ToneControls from './ToneControls';
 import ComparisonView from './ComparisonView';
 
@@ -22,6 +24,8 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     technicality: 50
   });
 
+  const { user, updateCredits } = useAuth();
+
   // Analyze samples and set initial tone settings when component mounts or samples change
   useEffect(() => {
     if (samples.length > 0) {
@@ -31,14 +35,36 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
   }, [samples]);
 
   const handleRewrite = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !user) return;
+    
+    // Check if user has credits
+    if (user.credits_remaining <= 0) {
+      alert('You have no credits remaining. Please upgrade your plan to continue.');
+      return;
+    }
     
     setIsRewriting(true);
     try {
       const rewriteResult = await rewriteText(inputText, samples, toneSettings);
       setResult(rewriteResult);
+
+      // Deduct credits and save to database
+      const creditsUsed = 1;
+      await updateCredits(creditsUsed);
+
+      // Save rewrite history
+      await supabase.from('rewrite_history').insert({
+        user_id: user.id,
+        original_text: rewriteResult.original,
+        rewritten_text: rewriteResult.rewritten,
+        confidence: rewriteResult.confidence,
+        style_tags: rewriteResult.styleTags,
+        credits_used: creditsUsed,
+      });
+
     } catch (error) {
       console.error('Rewrite failed:', error);
+      alert('Rewrite failed. Please try again.');
     } finally {
       setIsRewriting(false);
     }
@@ -69,6 +95,8 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     URL.revokeObjectURL(url);
   };
 
+  const canRewrite = user && user.credits_remaining > 0 && inputText.trim();
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 mb-8 sm:mb-10">
@@ -87,14 +115,45 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           <p className="text-gray-300 text-sm sm:text-base lg:text-lg">Transform any text to match your writing style</p>
         </div>
         
-        <button
-          onClick={() => setShowToneControls(!showToneControls)}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg sm:rounded-xl transition-all backdrop-blur-sm border border-white/20 text-sm sm:text-base"
-        >
-          <Sliders className="w-4 h-4" />
-          Tone Controls
-        </button>
+        <div className="flex items-center gap-3">
+          {user && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg border border-white/20">
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <span className="text-white text-sm font-medium">{user.credits_remaining}</span>
+            </div>
+          )}
+          <button
+            onClick={() => setShowToneControls(!showToneControls)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg sm:rounded-xl transition-all backdrop-blur-sm border border-white/20 text-sm sm:text-base"
+          >
+            <Sliders className="w-4 h-4" />
+            Tone Controls
+          </button>
+        </div>
       </div>
+
+      {/* Credits Warning */}
+      {user && user.credits_remaining <= 3 && (
+        <div className="mb-6 sm:mb-8 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+            <div>
+              <p className="text-yellow-300 font-medium">
+                {user.credits_remaining === 0 
+                  ? 'No credits remaining' 
+                  : `Only ${user.credits_remaining} credits left`
+                }
+              </p>
+              <p className="text-yellow-400/80 text-sm">
+                {user.credits_remaining === 0 
+                  ? 'Upgrade your plan to continue rewriting text.'
+                  : 'Consider upgrading your plan for more rewrites.'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tone Controls */}
       {showToneControls && (
@@ -132,8 +191,8 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             {result && (
               <button
                 onClick={handleRewrite}
-                disabled={isRewriting}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg sm:rounded-xl transition-colors border border-white/20 text-sm sm:text-base"
+                disabled={isRewriting || !canRewrite}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg sm:rounded-xl transition-colors border border-white/20 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw className="w-4 h-4" />
                 Rewrite Again
@@ -141,7 +200,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             )}
             <button
               onClick={handleRewrite}
-              disabled={!inputText.trim() || isRewriting}
+              disabled={!canRewrite || isRewriting}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25 text-sm sm:text-base"
             >
               {isRewriting ? (
@@ -152,7 +211,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
               ) : (
                 <>
                   <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Rewrite Text
+                  Rewrite Text {user && `(${user.credits_remaining} credits)`}
                 </>
               )}
             </button>

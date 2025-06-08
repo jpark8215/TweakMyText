@@ -28,3 +28,27 @@ export interface ToneSettings {
   enthusiasm: number; // 0-100
   technicality: number; // 0-100
 }
+
+export interface User {
+  id: string;
+  email: string;
+  subscription_tier: 'free' | 'pro' | 'premium';
+  credits_remaining: number;
+  subscription_expires_at?: Date;
+  created_at: Date;
+}
+
+export interface PricingTier {
+  id: string;
+  name: string;
+  price: number;
+  credits: number;
+  features: string[];
+  popular?: boolean;
+}
+
+export interface UsageStats {
+  total_rewrites: number;
+  credits_used: number;
+  last_rewrite: Date;
+}
