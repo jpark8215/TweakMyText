@@ -23,29 +23,39 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Header */}
-      <header className="bg-white bg-opacity-80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
+      <header className="bg-white/10 backdrop-blur-xl border-b border-white/20 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
-                <PenTool className="w-5 h-5 text-white" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+                <PenTool className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">TweakMyText</h1>
-                <p className="text-sm text-gray-600">AI-Powered Writing Style Rewriter</p>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                  TweakMyText
+                </h1>
+                <p className="text-sm text-gray-300">AI-Powered Writing Style Rewriter</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${currentView === 'capture' ? 'bg-blue-600' : 'bg-gray-300'}`} />
-                <span className="text-sm text-gray-600">Capture</span>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  currentView === 'capture' 
+                    ? 'bg-gradient-to-r from-cyan-400 to-purple-500 shadow-lg shadow-cyan-400/50' 
+                    : 'bg-gray-600'
+                }`} />
+                <span className="text-sm text-gray-300 font-medium">Capture</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${currentView === 'rewrite' ? 'bg-blue-600' : 'bg-gray-300'}`} />
-                <span className="text-sm text-gray-600">Rewrite</span>
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  currentView === 'rewrite' 
+                    ? 'bg-gradient-to-r from-cyan-400 to-purple-500 shadow-lg shadow-cyan-400/50' 
+                    : 'bg-gray-600'
+                }`} />
+                <span className="text-sm text-gray-300 font-medium">Rewrite</span>
               </div>
             </div>
           </div>
@@ -69,10 +79,10 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white bg-opacity-80 backdrop-blur-sm border-t border-gray-200 mt-16">
+      <footer className="bg-white/5 backdrop-blur-xl border-t border-white/10 mt-16">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-center gap-2 text-gray-600">
-            <Sparkles className="w-4 h-4" />
+          <div className="flex items-center justify-center gap-3 text-gray-400">
+            <Sparkles className="w-5 h-5 text-cyan-400" />
             <span className="text-sm">Transform any text to match your unique writing style</span>
           </div>
         </div>
