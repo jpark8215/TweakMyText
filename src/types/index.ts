@@ -34,6 +34,10 @@ export interface User {
   email: string;
   subscription_tier: 'free' | 'pro' | 'premium';
   credits_remaining: number;
+  daily_credits_used: number;
+  monthly_credits_used: number;
+  last_credit_reset: string;
+  monthly_reset_date: number;
   subscription_expires_at?: Date;
   created_at: Date;
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle } from 'lucide-react';
+import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
 import { rewriteText, analyzeToneFromSamples } from '../utils/styleAnalyzer';
 import { useAuth } from '../hooks/useAuth';
@@ -39,7 +39,19 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     
     // Check if user has credits
     if (user.credits_remaining <= 0) {
-      alert('You have no credits remaining. Please upgrade your plan to continue.');
+      alert('You have no credits remaining. Please wait for your daily reset or upgrade your plan.');
+      return;
+    }
+
+    // Check daily limit for free users
+    if (user.subscription_tier === 'free' && user.daily_credits_used >= 2) {
+      alert('You have reached your daily limit of 2 rewrites. Credits reset at midnight UTC.');
+      return;
+    }
+
+    // Check monthly limit for free users
+    if (user.subscription_tier === 'free' && user.monthly_credits_used >= 30) {
+      alert('You have reached your monthly limit of 30 rewrites. Limit resets on your signup anniversary.');
       return;
     }
     
@@ -50,7 +62,12 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
 
       // Deduct credits and save to database
       const creditsUsed = 1;
-      await updateCredits(creditsUsed);
+      const { error } = await updateCredits(creditsUsed);
+      
+      if (error) {
+        alert(error.message);
+        return;
+      }
 
       // Save rewrite history
       await supabase.from('rewrite_history').insert({
@@ -95,7 +112,17 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     URL.revokeObjectURL(url);
   };
 
-  const canRewrite = user && user.credits_remaining > 0 && inputText.trim();
+  const canRewrite = user && user.credits_remaining > 0 && inputText.trim() && 
+    (user.subscription_tier !== 'free' || (user.daily_credits_used < 2 && user.monthly_credits_used < 30));
+
+  const getTimeUntilReset = () => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const hoursUntilReset = Math.ceil((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60));
+    return hoursUntilReset;
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -120,6 +147,11 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg border border-white/20">
               <Zap className="w-4 h-4 text-yellow-400" />
               <span className="text-white text-sm font-medium">{user.credits_remaining}</span>
+              {user.subscription_tier === 'free' && (
+                <span className="text-xs text-gray-400">
+                  ({user.daily_credits_used}/2 today)
+                </span>
+              )}
             </div>
           )}
           <button
@@ -133,25 +165,65 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       </div>
 
       {/* Credits Warning */}
-      {user && user.credits_remaining <= 3 && (
-        <div className="mb-6 sm:mb-8 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
-            <div>
-              <p className="text-yellow-300 font-medium">
-                {user.credits_remaining === 0 
-                  ? 'No credits remaining' 
-                  : `Only ${user.credits_remaining} credits left`
-                }
-              </p>
-              <p className="text-yellow-400/80 text-sm">
-                {user.credits_remaining === 0 
-                  ? 'Upgrade your plan to continue rewriting text.'
-                  : 'Consider upgrading your plan for more rewrites.'
-                }
-              </p>
+      {user && user.subscription_tier === 'free' && (
+        <div className="mb-6 sm:mb-8 space-y-4">
+          {user.credits_remaining === 0 && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                <div>
+                  <p className="text-red-300 font-medium">No credits remaining</p>
+                  <p className="text-red-400/80 text-sm">
+                    Your daily credits will reset in {getTimeUntilReset()} hours at midnight UTC.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+          
+          {user.daily_credits_used >= 2 && user.credits_remaining > 0 && (
+            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+                <div>
+                  <p className="text-yellow-300 font-medium">Daily limit reached</p>
+                  <p className="text-yellow-400/80 text-sm">
+                    You've used your 2 daily credits. Reset in {getTimeUntilReset()} hours.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {user.monthly_credits_used >= 25 && user.monthly_credits_used < 30 && (
+            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-5 h-5 text-orange-400 flex-shrink-0" />
+                <div>
+                  <p className="text-orange-300 font-medium">
+                    {30 - user.monthly_credits_used} credits left this month
+                  </p>
+                  <p className="text-orange-400/80 text-sm">
+                    Monthly limit resets on day {user.monthly_reset_date} of each month.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {user.monthly_credits_used >= 30 && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-5 h-5 text-red-400 flex-shrink-0" />
+                <div>
+                  <p className="text-red-300 font-medium">Monthly limit reached</p>
+                  <p className="text-red-400/80 text-sm">
+                    You've used all 30 monthly credits. Limit resets on day {user.monthly_reset_date}.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -211,7 +283,12 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
               ) : (
                 <>
                   <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Rewrite Text {user && `(${user.credits_remaining} credits)`}
+                  Rewrite Text
+                  {user && user.subscription_tier === 'free' && (
+                    <span className="text-xs opacity-75">
+                      ({user.credits_remaining} left today)
+                    </span>
+                  )}
                 </>
               )}
             </button>

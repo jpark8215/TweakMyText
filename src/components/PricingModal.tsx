@@ -13,9 +13,10 @@ const pricingTiers: PricingTier[] = [
     id: 'free',
     name: 'Free',
     price: 0,
-    credits: 3,
+    credits: 2,
     features: [
-      '3 free rewrites',
+      '2 rewrites per day',
+      'Maximum 30 rewrites per month',
       'Basic style matching',
       'Standard processing speed',
       'Email support'
@@ -28,6 +29,7 @@ const pricingTiers: PricingTier[] = [
     credits: 100,
     features: [
       '100 rewrites per month',
+      'No daily limits',
       'Advanced style analysis',
       'Priority processing',
       'Tone fine-tuning',
@@ -43,6 +45,7 @@ const pricingTiers: PricingTier[] = [
     credits: 500,
     features: [
       '500 rewrites per month',
+      'No daily limits',
       'Premium AI models',
       'Instant processing',
       'Advanced tone controls',
@@ -73,6 +76,13 @@ export default function PricingModal({ isOpen, onClose, onSelectPlan }: PricingM
       case 'premium': return 'from-yellow-400 via-orange-500 to-pink-500';
       default: return 'from-gray-500 to-gray-600';
     }
+  };
+
+  const getCreditsText = (tier: PricingTier) => {
+    if (tier.id === 'free') {
+      return '2 per day (30/month max)';
+    }
+    return `${tier.credits} per month`;
   };
 
   return (
@@ -119,8 +129,7 @@ export default function PricingModal({ isOpen, onClose, onSelectPlan }: PricingM
                   {tier.price > 0 && <span className="text-gray-400">/month</span>}
                 </div>
                 <p className="text-cyan-300 font-medium">
-                  {tier.credits} {tier.credits === 1 ? 'rewrite' : 'rewrites'}
-                  {tier.price > 0 && ' per month'}
+                  {getCreditsText(tier)} rewrites
                 </p>
               </div>
 
@@ -150,6 +159,9 @@ export default function PricingModal({ isOpen, onClose, onSelectPlan }: PricingM
         <div className="mt-8 text-center">
           <p className="text-gray-400 text-sm">
             All plans include secure processing and data privacy protection
+          </p>
+          <p className="text-gray-500 text-xs mt-2">
+            Free tier: Credits reset daily at midnight UTC. Monthly limit resets on your signup anniversary.
           </p>
         </div>
       </div>

@@ -34,6 +34,10 @@ export const useAuth = () => {
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
+      // Reset daily/monthly credits if needed
+      await supabase.rpc('reset_daily_credits');
+      await supabase.rpc('reset_monthly_credits');
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -46,7 +50,11 @@ export const useAuth = () => {
           id: authUser.id,
           email: authUser.email!,
           subscription_tier: 'free' as const,
-          credits_remaining: 3,
+          credits_remaining: 2,
+          daily_credits_used: 0,
+          monthly_credits_used: 0,
+          last_credit_reset: new Date().toISOString().split('T')[0],
+          monthly_reset_date: new Date().getDate(),
         };
 
         const { data: createdUser, error: createError } = await supabase
@@ -103,17 +111,83 @@ export const useAuth = () => {
   };
 
   const updateCredits = async (creditsUsed: number) => {
-    if (!user) return;
+    if (!user) return { error: new Error('No user found') };
+
+    // Check daily and monthly limits for free users
+    if (user.subscription_tier === 'free') {
+      const today = new Date().toISOString().split('T')[0];
+      const currentDay = new Date().getDate();
+      
+      // Reset daily credits if it's a new day
+      if (user.last_credit_reset !== today) {
+        const maxDailyCredits = Math.min(2, 30 - user.monthly_credits_used);
+        await supabase
+          .from('users')
+          .update({ 
+            credits_remaining: maxDailyCredits,
+            daily_credits_used: 0,
+            last_credit_reset: today
+          })
+          .eq('id', user.id);
+        
+        setUser({ 
+          ...user, 
+          credits_remaining: maxDailyCredits,
+          daily_credits_used: 0,
+          last_credit_reset: today
+        });
+      }
+
+      // Reset monthly credits if it's the monthly reset day
+      if (currentDay === user.monthly_reset_date && user.last_credit_reset !== today) {
+        await supabase
+          .from('users')
+          .update({ 
+            monthly_credits_used: 0,
+            credits_remaining: 2,
+            daily_credits_used: 0
+          })
+          .eq('id', user.id);
+        
+        setUser({ 
+          ...user, 
+          monthly_credits_used: 0,
+          credits_remaining: 2,
+          daily_credits_used: 0
+        });
+      }
+
+      // Check if user has exceeded monthly limit
+      if (user.monthly_credits_used >= 30) {
+        return { error: new Error('Monthly credit limit reached (30 credits)') };
+      }
+
+      // Check if user has exceeded daily limit
+      if (user.daily_credits_used >= 2) {
+        return { error: new Error('Daily credit limit reached (2 credits)') };
+      }
+    }
 
     const newCredits = Math.max(0, user.credits_remaining - creditsUsed);
+    const newDailyUsed = user.daily_credits_used + creditsUsed;
+    const newMonthlyUsed = user.monthly_credits_used + creditsUsed;
     
     const { error } = await supabase
       .from('users')
-      .update({ credits_remaining: newCredits })
+      .update({ 
+        credits_remaining: newCredits,
+        daily_credits_used: newDailyUsed,
+        monthly_credits_used: newMonthlyUsed
+      })
       .eq('id', user.id);
 
     if (!error) {
-      setUser({ ...user, credits_remaining: newCredits });
+      setUser({ 
+        ...user, 
+        credits_remaining: newCredits,
+        daily_credits_used: newDailyUsed,
+        monthly_credits_used: newMonthlyUsed
+      });
     }
 
     return { error };
