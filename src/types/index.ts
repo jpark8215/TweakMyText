@@ -3,6 +3,7 @@ export interface WritingSample {
   content: string;
   title: string;
   createdAt: Date;
+  saved?: boolean; // Whether the sample is saved to database
 }
 
 export interface WritingProfile {
