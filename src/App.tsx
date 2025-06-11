@@ -4,6 +4,7 @@ import StyleCapture from './components/StyleCapture';
 import TextRewriter from './components/TextRewriter';
 import AuthModal from './components/AuthModal';
 import PricingModal from './components/PricingModal';
+import SubscriptionManagement from './components/SubscriptionManagement';
 import UserMenu from './components/UserMenu';
 import { WritingSample } from './types';
 import { useAuth } from './hooks/useAuth';
@@ -15,6 +16,7 @@ function App() {
   const [writingSamples, setWritingSamples] = useState<WritingSample[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   const { user, loading } = useAuth();
 
@@ -102,7 +104,7 @@ function App() {
                     <CreditCard className="w-4 h-4" />
                     Upgrade
                   </button>
-                  <UserMenu />
+                  <UserMenu onOpenSubscription={() => setShowSubscriptionModal(true)} />
                 </div>
               ) : (
                 <button
@@ -154,6 +156,11 @@ function App() {
         isOpen={showPricingModal} 
         onClose={() => setShowPricingModal(false)}
         onSelectPlan={handleSelectPlan}
+      />
+
+      <SubscriptionManagement
+        isOpen={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
       />
     </div>
   );
