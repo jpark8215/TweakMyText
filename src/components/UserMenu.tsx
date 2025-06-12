@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { User, LogOut, Settings, Zap } from 'lucide-react';
+import { User, LogOut, Settings, Zap, Crown } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 interface UserMenuProps {
   onOpenSettings?: () => void;
+  onManageSubscription?: () => void;
+  onOpenPricing?: () => void;
 }
 
-export default function UserMenu({ onOpenSettings }: UserMenuProps) {
+export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenPricing }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
 
@@ -24,6 +26,16 @@ export default function UserMenu({ onOpenSettings }: UserMenuProps) {
   const handleSettingsClick = () => {
     setIsOpen(false);
     onOpenSettings?.();
+  };
+
+  const handleSubscriptionClick = () => {
+    setIsOpen(false);
+    onManageSubscription?.();
+  };
+
+  const handleUpgradeClick = () => {
+    setIsOpen(false);
+    onOpenPricing?.();
   };
 
   const getTierColor = (tier: string) => {
@@ -99,6 +111,24 @@ export default function UserMenu({ onOpenSettings }: UserMenuProps) {
                 <Settings className="w-4 h-4" />
                 Settings
               </button>
+
+              <button
+                onClick={handleSubscriptionClick}
+                className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+              >
+                <Crown className="w-4 h-4" />
+                Manage Subscription
+              </button>
+
+              {user.subscription_tier === 'free' && (
+                <button
+                  onClick={handleUpgradeClick}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition-colors text-left"
+                >
+                  <Crown className="w-4 h-4" />
+                  Upgrade Plan
+                </button>
+              )}
               
               <hr className="my-2 border-white/10" />
               

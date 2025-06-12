@@ -4,17 +4,20 @@ import StyleCapture from './components/StyleCapture';
 import TextRewriter from './components/TextRewriter';
 import AuthModal from './components/AuthModal';
 import SettingsModal from './components/SettingsModal';
+import PricingModal from './components/PricingModal';
+import SubscriptionManagement from './components/SubscriptionManagement';
 import UserMenu from './components/UserMenu';
 import { WritingSample } from './types';
 import { useAuth } from './hooks/useAuth';
 
-type AppView = 'capture' | 'rewrite';
+type AppView = 'capture' | 'rewrite' | 'subscription';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('capture');
   const [writingSamples, setWritingSamples] = useState<WritingSample[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
 
   const { user, loading } = useAuth();
 
@@ -32,6 +35,11 @@ function App() {
 
   const handleBack = () => {
     setCurrentView('capture');
+  };
+
+  const handleManageSubscription = () => {
+    setCurrentView('subscription');
+    setShowSettingsModal(false);
   };
 
   if (loading) {
@@ -67,28 +75,34 @@ function App() {
             
             <div className="flex items-center gap-4 sm:gap-6">
               {/* Progress Indicators */}
-              <div className="flex items-center gap-4 sm:gap-6">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
-                    currentView === 'capture' 
-                      ? 'bg-gradient-to-r from-cyan-400 to-purple-500 shadow-lg shadow-cyan-400/50' 
-                      : 'bg-gray-600'
-                  }`} />
-                  <span className="text-xs sm:text-sm text-gray-300 font-medium">Capture</span>
+              {currentView !== 'subscription' && (
+                <div className="flex items-center gap-4 sm:gap-6">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
+                      currentView === 'capture' 
+                        ? 'bg-gradient-to-r from-cyan-400 to-purple-500 shadow-lg shadow-cyan-400/50' 
+                        : 'bg-gray-600'
+                    }`} />
+                    <span className="text-xs sm:text-sm text-gray-300 font-medium">Capture</span>
+                  </div>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
+                      currentView === 'rewrite' 
+                        ? 'bg-gradient-to-r from-cyan-400 to-purple-500 shadow-lg shadow-cyan-400/50' 
+                        : 'bg-gray-600'
+                    }`} />
+                    <span className="text-xs sm:text-sm text-gray-300 font-medium">Rewrite</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
-                    currentView === 'rewrite' 
-                      ? 'bg-gradient-to-r from-cyan-400 to-purple-500 shadow-lg shadow-cyan-400/50' 
-                      : 'bg-gray-600'
-                  }`} />
-                  <span className="text-xs sm:text-sm text-gray-300 font-medium">Rewrite</span>
-                </div>
-              </div>
+              )}
 
               {/* Auth/User Section */}
               {user ? (
-                <UserMenu onOpenSettings={() => setShowSettingsModal(true)} />
+                <UserMenu 
+                  onOpenSettings={() => setShowSettingsModal(true)}
+                  onManageSubscription={handleManageSubscription}
+                  onOpenPricing={() => setShowPricingModal(true)}
+                />
               ) : (
                 <button
                   onClick={() => setShowAuthModal(true)}
@@ -111,10 +125,14 @@ function App() {
             onSamplesChange={handleSamplesChange}
             onNext={handleNext}
           />
-        ) : (
+        ) : currentView === 'rewrite' ? (
           <TextRewriter
             samples={writingSamples}
             onBack={handleBack}
+          />
+        ) : (
+          <SubscriptionManagement
+            onBack={() => setCurrentView('capture')}
           />
         )}
       </main>
@@ -138,6 +156,12 @@ function App() {
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
+        onManageSubscription={handleManageSubscription}
+      />
+
+      <PricingModal
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
       />
     </div>
   );

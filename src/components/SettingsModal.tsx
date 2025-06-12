@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { X, Lock, Eye, EyeOff, Check, AlertCircle } from 'lucide-react';
+import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onManageSubscription?: () => void;
 }
 
-export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export default function SettingsModal({ isOpen, onClose, onManageSubscription }: SettingsModalProps) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -66,6 +67,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     onClose();
   };
 
+  const handleManageSubscriptionClick = () => {
+    handleClose();
+    onManageSubscription?.();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl border border-white/20 p-6 sm:p-8 w-full max-w-md shadow-2xl">
@@ -91,6 +97,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p className="text-gray-400 text-xs mt-1">
             Plan: <span className="text-cyan-400 capitalize">{user.subscription_tier}</span>
           </p>
+        </div>
+
+        {/* Subscription Management */}
+        <div className="mb-6">
+          <button
+            onClick={handleManageSubscriptionClick}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-medium hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 shadow-lg shadow-purple-500/25"
+          >
+            <Crown className="w-5 h-5" />
+            Manage Subscription
+          </button>
         </div>
 
         {/* Password Change Form */}
