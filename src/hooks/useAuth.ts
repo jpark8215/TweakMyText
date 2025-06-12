@@ -107,6 +107,9 @@ export const useAuth = () => {
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
+    if (!error) {
+      setUser(null);
+    }
     return { error };
   };
 

@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { PenTool, Sparkles, LogIn, CreditCard } from 'lucide-react';
+import { PenTool, Sparkles, LogIn } from 'lucide-react';
 import StyleCapture from './components/StyleCapture';
 import TextRewriter from './components/TextRewriter';
 import AuthModal from './components/AuthModal';
-import PricingModal from './components/PricingModal';
-import SubscriptionManagement from './components/SubscriptionManagement';
+import SettingsModal from './components/SettingsModal';
 import UserMenu from './components/UserMenu';
 import { WritingSample } from './types';
 import { useAuth } from './hooks/useAuth';
@@ -15,8 +14,7 @@ function App() {
   const [currentView, setCurrentView] = useState<AppView>('capture');
   const [writingSamples, setWritingSamples] = useState<WritingSample[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showPricingModal, setShowPricingModal] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const { user, loading } = useAuth();
 
@@ -34,12 +32,6 @@ function App() {
 
   const handleBack = () => {
     setCurrentView('capture');
-  };
-
-  const handleSelectPlan = (tier: string) => {
-    // In production, integrate with Stripe or payment processor
-    console.log('Selected plan:', tier);
-    setShowPricingModal(false);
   };
 
   if (loading) {
@@ -96,16 +88,7 @@ function App() {
 
               {/* Auth/User Section */}
               {user ? (
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setShowPricingModal(true)}
-                    className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg text-sm font-medium hover:from-yellow-600 hover:to-orange-600 transition-all"
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    Upgrade
-                  </button>
-                  <UserMenu onOpenSubscription={() => setShowSubscriptionModal(true)} />
-                </div>
+                <UserMenu onOpenSettings={() => setShowSettingsModal(true)} />
               ) : (
                 <button
                   onClick={() => setShowAuthModal(true)}
@@ -151,16 +134,10 @@ function App() {
         isOpen={showAuthModal} 
         onClose={() => setShowAuthModal(false)} 
       />
-      
-      <PricingModal 
-        isOpen={showPricingModal} 
-        onClose={() => setShowPricingModal(false)}
-        onSelectPlan={handleSelectPlan}
-      />
 
-      <SubscriptionManagement
-        isOpen={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
       />
     </div>
   );

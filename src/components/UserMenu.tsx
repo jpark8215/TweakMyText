@@ -1,25 +1,29 @@
 import React, { useState } from 'react';
-import { User, LogOut, CreditCard, Settings, Zap } from 'lucide-react';
+import { User, LogOut, Settings, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 interface UserMenuProps {
-  onOpenSubscription?: () => void;
+  onOpenSettings?: () => void;
 }
 
-export default function UserMenu({ onOpenSubscription }: UserMenuProps) {
+export default function UserMenu({ onOpenSettings }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
 
   if (!user) return null;
 
   const handleSignOut = async () => {
-    await signOut();
-    setIsOpen(false);
+    try {
+      await signOut();
+      setIsOpen(false);
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
-  const handleSubscriptionClick = () => {
+  const handleSettingsClick = () => {
     setIsOpen(false);
-    onOpenSubscription?.();
+    onOpenSettings?.();
   };
 
   const getTierColor = (tier: string) => {
@@ -89,15 +93,7 @@ export default function UserMenu({ onOpenSubscription }: UserMenuProps) {
 
             <div className="p-2">
               <button
-                onClick={handleSubscriptionClick}
-                className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
-              >
-                <CreditCard className="w-4 h-4" />
-                Manage Subscription
-              </button>
-              
-              <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleSettingsClick}
                 className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
               >
                 <Settings className="w-4 h-4" />
