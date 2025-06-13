@@ -12,42 +12,43 @@ const pricingTiers: PricingTier[] = [
     id: 'free',
     name: 'Free',
     price: 0,
-    credits: 30,
+    credits: 90,
     features: [
-      '2 rewrites per day',
-      '30 rewrites per month max',
+      '3 rewrites per day (90 per month)',
+      '5 rewrites per month for export',
       'Basic style analysis',
-      'Save writing samples',
-      'Export results'
+      'Save up to 3 writing samples',
+      'Export results (limited to 5 rewrites per month)'
     ]
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: 9.99,
-    credits: 500,
+    price: 4.99,
+    credits: 200,
     features: [
-      '500 rewrites per month',
+      '200 rewrites per month',
       'Advanced style analysis',
       'Priority processing',
-      'Unlimited writing samples',
-      'Export & history',
-      'Email support'
+      'Save up to 25 writing samples',
+      'Export results (up to 200 rewrites)',
+      'Access to basic tone presets'
     ],
     popular: true
   },
   {
     id: 'premium',
     name: 'Premium',
-    price: 19.99,
-    credits: 2000,
+    price: 7.99,
+    credits: 300,
     features: [
-      '2000 rewrites per month',
-      'Premium AI models',
-      'Custom style training',
-      'Team collaboration',
-      'API access',
-      'Priority support'
+      '300 rewrites per month',
+      'Everything in Pro Tier',
+      'Custom tone finetuning',
+      'Save up to 100 writing samples',
+      'Export results & rewrite history (up to 300 rewrites)',
+      'Extended style analysis',
+      'Faster processing times'
     ]
   }
 ];
