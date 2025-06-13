@@ -50,7 +50,7 @@ export const useAuth = () => {
           id: authUser.id,
           email: authUser.email!,
           subscription_tier: 'free' as const,
-          credits_remaining: 2,
+          credits_remaining: 3,
           daily_credits_used: 0,
           monthly_credits_used: 0,
           last_credit_reset: new Date().toISOString().split('T')[0],
@@ -123,7 +123,7 @@ export const useAuth = () => {
       
       // Reset daily credits if it's a new day
       if (user.last_credit_reset !== today) {
-        const maxDailyCredits = Math.min(2, 30 - user.monthly_credits_used);
+        const maxDailyCredits = Math.min(3, 90 - user.monthly_credits_used);
         await supabase
           .from('users')
           .update({ 
@@ -147,7 +147,7 @@ export const useAuth = () => {
           .from('users')
           .update({ 
             monthly_credits_used: 0,
-            credits_remaining: 2,
+            credits_remaining: 3,
             daily_credits_used: 0
           })
           .eq('id', user.id);
@@ -155,19 +155,19 @@ export const useAuth = () => {
         setUser({ 
           ...user, 
           monthly_credits_used: 0,
-          credits_remaining: 2,
+          credits_remaining: 3,
           daily_credits_used: 0
         });
       }
 
       // Check if user has exceeded monthly limit
-      if (user.monthly_credits_used >= 30) {
-        return { error: new Error('Monthly credit limit reached (30 credits)') };
+      if (user.monthly_credits_used >= 90) {
+        return { error: new Error('Monthly credit limit reached (90 credits)') };
       }
 
       // Check if user has exceeded daily limit
-      if (user.daily_credits_used >= 2) {
-        return { error: new Error('Daily credit limit reached (2 credits)') };
+      if (user.daily_credits_used >= 3) {
+        return { error: new Error('Daily credit limit reached (3 credits)') };
       }
     }
 

@@ -37,22 +37,22 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
       case 'pro':
         return {
           name: 'Pro',
-          price: '$9.99/month',
-          credits: '500 credits/month',
+          price: '$4.99/month',
+          credits: '200 credits/month',
           color: 'from-cyan-400 to-blue-500'
         };
       case 'premium':
         return {
           name: 'Premium',
-          price: '$19.99/month',
-          credits: '2000 credits/month',
+          price: '$7.99/month',
+          credits: '300 credits/month',
           color: 'from-yellow-400 to-orange-500'
         };
       default:
         return {
           name: 'Free',
           price: 'Free',
-          credits: '30 credits/month max',
+          credits: '90 credits/month max',
           color: 'from-gray-400 to-gray-500'
         };
     }

@@ -44,14 +44,14 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     }
 
     // Check daily limit for free users
-    if (user.subscription_tier === 'free' && user.daily_credits_used >= 2) {
-      alert('You have reached your daily limit of 2 rewrites. Credits reset at midnight UTC.');
+    if (user.subscription_tier === 'free' && user.daily_credits_used >= 3) {
+      alert('You have reached your daily limit of 3 rewrites. Credits reset at midnight UTC.');
       return;
     }
 
     // Check monthly limit for free users
-    if (user.subscription_tier === 'free' && user.monthly_credits_used >= 30) {
-      alert('You have reached your monthly limit of 30 rewrites. Limit resets on your signup anniversary.');
+    if (user.subscription_tier === 'free' && user.monthly_credits_used >= 90) {
+      alert('You have reached your monthly limit of 90 rewrites. Limit resets on your signup anniversary.');
       return;
     }
     
@@ -113,7 +113,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
   };
 
   const canRewrite = user && user.credits_remaining > 0 && inputText.trim() && 
-    (user.subscription_tier !== 'free' || (user.daily_credits_used < 2 && user.monthly_credits_used < 30));
+    (user.subscription_tier !== 'free' || (user.daily_credits_used < 3 && user.monthly_credits_used < 90));
 
   const getTimeUntilReset = () => {
     const now = new Date();
@@ -149,7 +149,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
               <span className="text-white text-sm font-medium">{user.credits_remaining}</span>
               {user.subscription_tier === 'free' && (
                 <span className="text-xs text-gray-400">
-                  ({user.daily_credits_used}/2 today)
+                  ({user.daily_credits_used}/3 today)
                 </span>
               )}
             </div>
@@ -181,27 +181,27 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             </div>
           )}
           
-          {user.daily_credits_used >= 2 && user.credits_remaining > 0 && (
+          {user.daily_credits_used >= 3 && user.credits_remaining > 0 && (
             <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-yellow-400 flex-shrink-0" />
                 <div>
                   <p className="text-yellow-300 font-medium">Daily limit reached</p>
                   <p className="text-yellow-400/80 text-sm">
-                    You've used your 2 daily credits. Reset in {getTimeUntilReset()} hours.
+                    You've used your 3 daily credits. Reset in {getTimeUntilReset()} hours.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {user.monthly_credits_used >= 25 && user.monthly_credits_used < 30 && (
+          {user.monthly_credits_used >= 75 && user.monthly_credits_used < 90 && (
             <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
               <div className="flex items-center gap-3">
                 <Calendar className="w-5 h-5 text-orange-400 flex-shrink-0" />
                 <div>
                   <p className="text-orange-300 font-medium">
-                    {30 - user.monthly_credits_used} credits left this month
+                    {90 - user.monthly_credits_used} credits left this month
                   </p>
                   <p className="text-orange-400/80 text-sm">
                     Monthly limit resets on day {user.monthly_reset_date} of each month.
@@ -211,14 +211,14 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             </div>
           )}
 
-          {user.monthly_credits_used >= 30 && (
+          {user.monthly_credits_used >= 90 && (
             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
               <div className="flex items-center gap-3">
                 <Calendar className="w-5 h-5 text-red-400 flex-shrink-0" />
                 <div>
                   <p className="text-red-300 font-medium">Monthly limit reached</p>
                   <p className="text-red-400/80 text-sm">
-                    You've used all 30 monthly credits. Limit resets on day {user.monthly_reset_date}.
+                    You've used all 90 monthly credits. Limit resets on day {user.monthly_reset_date}.
                   </p>
                 </div>
               </div>

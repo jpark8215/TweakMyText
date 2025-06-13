@@ -128,7 +128,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         {isSignUp && (
           <div className="mt-4 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
             <p className="text-cyan-300 text-sm text-center">
-              🎉 New users get 2 free daily rewrites (30/month max)!
+              🎉 New users get 3 free daily rewrites!
             </p>
           </div>
         )}
