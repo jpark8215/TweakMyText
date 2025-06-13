@@ -68,7 +68,7 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
           className="inline-flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white transition-colors hover:bg-white/10 rounded-lg"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back to Settings
+          Back
         </button>
         <h1 className="text-2xl font-bold text-white">Subscription Management</h1>
       </div>
