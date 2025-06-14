@@ -10,6 +10,15 @@ interface StyleCaptureProps {
   onNext: () => void;
 }
 
+// Generate a proper UUID v4
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 export default function StyleCapture({ samples, onSamplesChange, onNext }: StyleCaptureProps) {
   const [newSample, setNewSample] = useState({ title: '', content: '' });
   const [loading, setLoading] = useState(false);
@@ -109,7 +118,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
   const addSample = async () => {
     if (newSample.content.trim() && newSample.title.trim()) {
       const sample: WritingSample = {
-        id: Date.now().toString(),
+        id: generateUUID(), // Use proper UUID instead of timestamp
         title: newSample.title,
         content: newSample.content,
         createdAt: new Date(),
