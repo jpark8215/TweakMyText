@@ -10,20 +10,12 @@ interface StyleCaptureProps {
   onNext: () => void;
 }
 
-// Generate a proper UUID v4
-const generateUUID = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
-
 export default function StyleCapture({ samples, onSamplesChange, onNext }: StyleCaptureProps) {
   const [newSample, setNewSample] = useState({ title: '', content: '' });
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const { user } = useAuth();
 
@@ -38,6 +30,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
     if (!user) return;
 
     setLoading(true);
+    setError(null);
     try {
       const { data, error } = await supabase
         .from('writing_samples')
@@ -52,14 +45,71 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
         title: sample.title,
         content: sample.content,
         createdAt: new Date(sample.created_at),
-        saved: true // Mark as saved in database
+        saved: true
       }));
 
       onSamplesChange(loadedSamples);
     } catch (error) {
       console.error('Error loading samples:', error);
+      setError('Failed to load your writing samples. Please refresh the page.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const addSample = async () => {
+    if (!newSample.content.trim() || !newSample.title.trim()) return;
+
+    const tempId = crypto.randomUUID();
+    const sample: WritingSample = {
+      id: tempId,
+      title: newSample.title,
+      content: newSample.content,
+      createdAt: new Date(),
+      saved: false
+    };
+    
+    // Optimistically add to local state
+    const updatedSamples = [...samples, sample];
+    onSamplesChange(updatedSamples);
+    setNewSample({ title: '', content: '' });
+    setError(null);
+
+    // Save to database if user is logged in
+    if (user) {
+      setSavingId(tempId);
+      try {
+        const { data, error } = await supabase
+          .from('writing_samples')
+          .insert({
+            user_id: user.id,
+            title: sample.title,
+            content: sample.content
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Update local state with the database ID and mark as saved
+        const finalSamples = updatedSamples.map(s => 
+          s.id === tempId 
+            ? { ...s, id: data.id, saved: true, createdAt: new Date(data.created_at) }
+            : s
+        );
+        onSamplesChange(finalSamples);
+      } catch (error) {
+        console.error('Error saving sample:', error);
+        setError('Failed to save sample to your account. It will be lost when you refresh.');
+        
+        // Mark as unsaved in local state
+        const errorSamples = updatedSamples.map(s => 
+          s.id === tempId ? { ...s, saved: false } : s
+        );
+        onSamplesChange(errorSamples);
+      } finally {
+        setSavingId(null);
+      }
     }
   };
 
@@ -67,83 +117,64 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
     if (!user || sample.saved) return;
 
     setSavingId(sample.id);
+    setError(null);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('writing_samples')
         .insert({
-          id: sample.id,
           user_id: user.id,
           title: sample.title,
           content: sample.content
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      // Mark sample as saved
+      // Update local state with database ID and mark as saved
       const updatedSamples = samples.map(s => 
-        s.id === sample.id ? { ...s, saved: true } : s
+        s.id === sample.id 
+          ? { ...s, id: data.id, saved: true, createdAt: new Date(data.created_at) }
+          : s
       );
       onSamplesChange(updatedSamples);
     } catch (error) {
       console.error('Error saving sample:', error);
-      alert('Failed to save sample. Please try again.');
+      setError('Failed to save sample. Please try again.');
     } finally {
       setSavingId(null);
     }
   };
 
-  const deleteSampleFromDatabase = async (sampleId: string) => {
-    if (!user) return;
+  const removeSample = async (sampleId: string) => {
+    const sample = samples.find(s => s.id === sampleId);
+    if (!sample) return;
 
-    setDeletingId(sampleId);
-    try {
-      const { error } = await supabase
-        .from('writing_samples')
-        .delete()
-        .eq('id', sampleId)
-        .eq('user_id', user.id);
+    setError(null);
 
-      if (error) throw error;
+    if (sample.saved && user) {
+      // Delete from database
+      setDeletingId(sampleId);
+      try {
+        const { error } = await supabase
+          .from('writing_samples')
+          .delete()
+          .eq('id', sampleId)
+          .eq('user_id', user.id);
 
-      // Remove from local state
-      onSamplesChange(samples.filter(s => s.id !== sampleId));
-    } catch (error) {
-      console.error('Error deleting sample:', error);
-      alert('Failed to delete sample. Please try again.');
-    } finally {
-      setDeletingId(null);
-    }
-  };
+        if (error) throw error;
 
-  const addSample = async () => {
-    if (newSample.content.trim() && newSample.title.trim()) {
-      const sample: WritingSample = {
-        id: generateUUID(), // Use proper UUID instead of timestamp
-        title: newSample.title,
-        content: newSample.content,
-        createdAt: new Date(),
-        saved: false
-      };
-      
-      const updatedSamples = [...samples, sample];
-      onSamplesChange(updatedSamples);
-      setNewSample({ title: '', content: '' });
-
-      // Auto-save if user is logged in
-      if (user) {
-        await saveSampleToDatabase(sample);
+        // Remove from local state only after successful deletion
+        onSamplesChange(samples.filter(s => s.id !== sampleId));
+      } catch (error) {
+        console.error('Error deleting sample:', error);
+        setError('Failed to delete sample. Please try again.');
+      } finally {
+        setDeletingId(null);
       }
-    }
-  };
-
-  const removeSample = async (id: string) => {
-    const sample = samples.find(s => s.id === id);
-    if (sample?.saved && user) {
-      // Delete from database if it's saved
-      await deleteSampleFromDatabase(id);
     } else {
       // Just remove from local state if not saved
-      onSamplesChange(samples.filter(s => s.id !== id));
+      onSamplesChange(samples.filter(s => s.id !== sampleId));
     }
   };
 
@@ -180,6 +211,19 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
           </p>
         )}
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <p className="text-red-400 text-sm">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-300 hover:text-red-200 text-xs mt-1 underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Existing Samples */}
       <div className="grid gap-4 sm:gap-6 mb-6 sm:mb-8">
@@ -279,7 +323,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
             </span>
             <button
               onClick={addSample}
-              disabled={!newSample.content.trim() || !newSample.title.trim()}
+              disabled={!newSample.content.trim() || !newSample.title.trim() || savingId !== null}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25 text-sm sm:text-base"
             >
               <Plus className="w-4 h-4" />
