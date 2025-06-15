@@ -50,10 +50,30 @@ export interface PricingTier {
   credits: number;
   features: string[];
   popular?: boolean;
+  limits?: {
+    writingSamples: number;
+    processingSpeed: number; // multiplier (1x, 2x, 3x)
+    exportFormats: string[];
+    historyAccess: boolean;
+    bulkOperations: boolean;
+    support: 'community' | 'email' | 'priority';
+  };
 }
 
 export interface UsageStats {
   total_rewrites: number;
   credits_used: number;
   last_rewrite: Date;
+}
+
+export interface SubscriptionLimits {
+  maxWritingSamples: number;
+  dailyRewriteLimit?: number;
+  monthlyRewriteLimit: number;
+  processingPriority: 'standard' | 'high' | 'premium';
+  exportFormats: string[];
+  historyRetention: number; // days
+  bulkOperations: boolean;
+  customTonePresets: boolean;
+  advancedAnalytics: boolean;
 }

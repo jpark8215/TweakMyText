@@ -14,11 +14,12 @@ const pricingTiers: PricingTier[] = [
     price: 0,
     credits: 90,
     features: [
-      '3 rewrites per day (90 per month)',
-      '5 rewrites per month for export',
+      '3 rewrites per day (90 per month max)',
       'Basic style analysis',
-      'Save up to 3 writing samples',
-      'Export results (limited to 5 rewrites per month)'
+      'Save up to 5 writing samples',
+      'Standard processing speed',
+      'Basic tone controls',
+      'Export results (JSON format)'
     ]
   },
   {
@@ -29,10 +30,12 @@ const pricingTiers: PricingTier[] = [
     features: [
       '200 rewrites per month',
       'Advanced style analysis',
-      'Priority processing',
       'Save up to 25 writing samples',
-      'Export results (up to 200 rewrites)',
-      'Access to basic tone presets'
+      'Priority processing (2x faster)',
+      'Advanced tone controls',
+      'Export results (JSON & TXT)',
+      'Rewrite history access',
+      'Email support'
     ],
     popular: true
   },
@@ -43,11 +46,15 @@ const pricingTiers: PricingTier[] = [
     credits: 300,
     features: [
       '300 rewrites per month',
-      'Extended style analysis',
-      'Priority processing',
-      'Save up to 100 writing samples',
-      'Export results & rewrite history (up to 300 rewrites)',
-      'Custom tone finetuning',
+      'Premium style analysis with confidence scoring',
+      'Save unlimited writing samples',
+      'Fastest processing (3x speed)',
+      'Custom tone presets & fine-tuning',
+      'Export in multiple formats (JSON, TXT, DOCX)',
+      'Full rewrite history with analytics',
+      'Bulk rewrite operations',
+      'Priority email support',
+      'Early access to new features'
     ]
   }
 ];
@@ -65,7 +72,7 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl border border-white/20 p-6 sm:p-8 w-full max-w-4xl shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl border border-white/20 p-6 sm:p-8 w-full max-w-5xl shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
@@ -111,15 +118,17 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-2 text-cyan-400">
                   <Zap className="w-4 h-4" />
-                  <span className="text-sm">{tier.credits} credits/month</span>
+                  <span className="text-sm">
+                    {tier.id === 'free' ? '3/day (90 max)' : `${tier.credits} credits/month`}
+                  </span>
                 </div>
               </div>
 
               <ul className="space-y-3 mb-6">
                 {tier.features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-3 text-gray-300">
-                    <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <span className="text-sm">{feature}</span>
+                  <li key={index} className="flex items-start gap-3 text-gray-300">
+                    <Check className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm leading-relaxed">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -141,10 +150,43 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
           ))}
         </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-gray-400 text-sm">
-            All plans include secure payment processing and can be cancelled anytime.
-          </p>
+        <div className="mt-8 space-y-4">
+          <div className="text-center">
+            <p className="text-gray-400 text-sm">
+              All plans include secure payment processing and can be cancelled anytime.
+            </p>
+          </div>
+          
+          {/* Feature Comparison */}
+          <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-4 text-center">Feature Comparison</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="space-y-2">
+                <h4 className="font-medium text-cyan-400">Writing Samples</h4>
+                <div className="space-y-1 text-gray-300">
+                  <div>Free: Up to 5 samples</div>
+                  <div>Pro: Up to 25 samples</div>
+                  <div>Premium: Unlimited samples</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-medium text-purple-400">Processing Speed</h4>
+                <div className="space-y-1 text-gray-300">
+                  <div>Free: Standard speed</div>
+                  <div>Pro: 2x faster processing</div>
+                  <div>Premium: 3x faster processing</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-medium text-pink-400">Export Options</h4>
+                <div className="space-y-1 text-gray-300">
+                  <div>Free: JSON format only</div>
+                  <div>Pro: JSON & TXT formats</div>
+                  <div>Premium: All formats + DOCX</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

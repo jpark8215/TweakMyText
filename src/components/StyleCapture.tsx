@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, FileText, Sparkles, ChevronRight, Zap, Trash2, Save } from 'lucide-react';
+import { Plus, X, FileText, Sparkles, ChevronRight, Zap, Trash2, Save, AlertCircle } from 'lucide-react';
 import { WritingSample } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
@@ -25,6 +25,21 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
       loadSavedSamples();
     }
   }, [user]);
+
+  const getSubscriptionLimits = () => {
+    if (!user) return { maxSamples: 5, canSave: false };
+    
+    switch (user.subscription_tier) {
+      case 'premium':
+        return { maxSamples: Infinity, canSave: true };
+      case 'pro':
+        return { maxSamples: 25, canSave: true };
+      default:
+        return { maxSamples: 5, canSave: true };
+    }
+  };
+
+  const limits = getSubscriptionLimits();
 
   const loadSavedSamples = async () => {
     if (!user) return;
@@ -60,6 +75,12 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
   const addSample = async () => {
     if (!newSample.content.trim() || !newSample.title.trim()) return;
 
+    // Check subscription limits
+    if (samples.length >= limits.maxSamples) {
+      setError(`You've reached your limit of ${limits.maxSamples} writing samples. ${user?.subscription_tier === 'free' ? 'Upgrade to Pro for 25 samples or Premium for unlimited samples.' : 'Please delete some samples to add new ones.'}`);
+      return;
+    }
+
     const tempId = crypto.randomUUID();
     const sample: WritingSample = {
       id: tempId,
@@ -76,7 +97,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
     setError(null);
 
     // Save to database if user is logged in
-    if (user) {
+    if (user && limits.canSave) {
       setSavingId(tempId);
       try {
         const { data, error } = await supabase
@@ -206,11 +227,47 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
           Add 2-3 samples of your writing so we can learn your unique voice and tone
         </p>
         {user && (
-          <p className="text-sm text-cyan-400 mt-2">
-            ✨ Your samples are automatically saved to your account
-          </p>
+          <div className="mt-4 space-y-2">
+            <p className="text-sm text-cyan-400">
+              ✨ Your samples are automatically saved to your account
+            </p>
+            <p className="text-xs text-gray-400">
+              {limits.maxSamples === Infinity 
+                ? `${samples.length} samples saved (Unlimited)`
+                : `${samples.length}/${limits.maxSamples} samples used`
+              }
+            </p>
+          </div>
         )}
       </div>
+
+      {/* Subscription Limit Warning */}
+      {user && samples.length >= limits.maxSamples - 1 && limits.maxSamples !== Infinity && (
+        <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+            <div>
+              <p className="text-yellow-300 font-medium">
+                {samples.length >= limits.maxSamples 
+                  ? 'Sample limit reached' 
+                  : 'Approaching sample limit'
+                }
+              </p>
+              <p className="text-yellow-400/80 text-sm">
+                {samples.length >= limits.maxSamples 
+                  ? `You've reached your limit of ${limits.maxSamples} samples. Delete some samples or upgrade your plan.`
+                  : `You can add ${limits.maxSamples - samples.length} more sample${limits.maxSamples - samples.length === 1 ? '' : 's'}.`
+                }
+                {user.subscription_tier === 'free' && (
+                  <span className="block mt-1">
+                    Upgrade to Pro for 25 samples or Premium for unlimited samples.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -305,7 +362,8 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
             placeholder="Sample title (e.g., 'Email to colleague', 'Blog post excerpt')"
             value={newSample.title}
             onChange={(e) => setNewSample({ ...newSample, title: e.target.value })}
-            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all backdrop-blur-sm text-sm sm:text-base"
+            disabled={samples.length >= limits.maxSamples}
+            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all backdrop-blur-sm text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
           />
           
           <textarea
@@ -313,7 +371,8 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
             value={newSample.content}
             onChange={(e) => setNewSample({ ...newSample, content: e.target.value })}
             rows={5}
-            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base"
+            disabled={samples.length >= limits.maxSamples}
+            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
           />
           
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
@@ -323,12 +382,12 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
             </span>
             <button
               onClick={addSample}
-              disabled={!newSample.content.trim() || !newSample.title.trim() || savingId !== null}
+              disabled={!newSample.content.trim() || !newSample.title.trim() || savingId !== null || samples.length >= limits.maxSamples}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25 text-sm sm:text-base"
             >
               <Plus className="w-4 h-4" />
-              Add Sample
-              {user && <span className="text-xs opacity-75">(Auto-save)</span>}
+              {samples.length >= limits.maxSamples ? 'Limit Reached' : 'Add Sample'}
+              {user && samples.length < limits.maxSamples && <span className="text-xs opacity-75">(Auto-save)</span>}
             </button>
           </div>
         </div>
