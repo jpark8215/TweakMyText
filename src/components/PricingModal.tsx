@@ -43,12 +43,11 @@ const pricingTiers: PricingTier[] = [
     credits: 300,
     features: [
       '300 rewrites per month',
-      'Everything in Pro Tier',
-      'Custom tone finetuning',
+      'Extended style analysis',
+      'Priority processing',
       'Save up to 100 writing samples',
       'Export results & rewrite history (up to 300 rewrites)',
-      'Extended style analysis',
-      'Faster processing times'
+      'Custom tone finetuning',
     ]
   }
 ];
