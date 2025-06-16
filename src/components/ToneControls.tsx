@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, BarChart3, Crown, Sparkles } from 'lucide-react';
+import { X, BarChart3, Crown, Sparkles, Star, Settings } from 'lucide-react';
 import { ToneSettings } from '../types';
 import { useAuth } from '../hooks/useAuth';
 
@@ -29,13 +29,21 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
   };
 
   const hasTonePresets = user && (user.subscription_tier === 'pro' || user.subscription_tier === 'premium');
-  const hasAdvancedControls = user && user.subscription_tier === 'premium';
+  const hasCustomTuning = user && user.subscription_tier === 'premium';
 
   const presets = [
     { name: 'Professional', values: { formality: 80, casualness: 20, enthusiasm: 40, technicality: 70 } },
     { name: 'Friendly', values: { formality: 30, casualness: 80, enthusiasm: 70, technicality: 30 } },
     { name: 'Academic', values: { formality: 90, casualness: 10, enthusiasm: 20, technicality: 90 } },
     { name: 'Casual', values: { formality: 20, casualness: 90, enthusiasm: 60, technicality: 20 } },
+  ];
+
+  // Premium-only advanced presets
+  const advancedPresets = [
+    { name: 'Executive', values: { formality: 95, casualness: 15, enthusiasm: 30, technicality: 60 } },
+    { name: 'Creative', values: { formality: 25, casualness: 75, enthusiasm: 85, technicality: 25 } },
+    { name: 'Technical', values: { formality: 70, casualness: 30, enthusiasm: 40, technicality: 95 } },
+    { name: 'Persuasive', values: { formality: 60, casualness: 50, enthusiasm: 80, technicality: 45 } },
   ];
 
   const applyPreset = (preset: typeof presets[0]) => {
@@ -90,9 +98,14 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
               {hasTonePresets && (
                 <Crown className="w-4 h-4 text-yellow-400" />
               )}
+              {hasCustomTuning && (
+                <Star className="w-4 h-4 text-yellow-400" />
+              )}
             </div>
             <p className="text-xs sm:text-sm text-gray-400">
-              {hasTonePresets ? 'Advanced tone controls with presets' : 'Automatically set based on your writing samples'}
+              {hasCustomTuning ? 'Custom tone fine-tuning with advanced presets' : 
+               hasTonePresets ? 'Advanced tone controls with presets' : 
+               'Automatically set based on your writing samples'}
             </p>
           </div>
         </div>
@@ -104,12 +117,17 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
         </button>
       </div>
 
-      {/* Tone Presets for Pro/Premium users */}
+      {/* Basic Tone Presets for Pro users */}
       {hasTonePresets && (
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-4 h-4 text-cyan-400" />
             <h4 className="text-base font-medium text-white">Quick Presets</h4>
+            {!hasCustomTuning && (
+              <div className="text-xs text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded px-2 py-1">
+                Pro
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {presets.map((preset) => (
@@ -125,12 +143,42 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
         </div>
       )}
 
+      {/* Advanced Presets for Premium users */}
+      {hasCustomTuning && (
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Settings className="w-4 h-4 text-yellow-400" />
+            <h4 className="text-base font-medium text-white">Advanced Presets</h4>
+            <div className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded px-2 py-1 flex items-center gap-1">
+              <Star className="w-3 h-3" />
+              Premium
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            {advancedPresets.map((preset) => (
+              <button
+                key={preset.name}
+                onClick={() => applyPreset(preset)}
+                className="px-3 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 text-xs sm:text-sm font-medium rounded-lg border border-yellow-400/30 hover:border-yellow-400/50 transition-all backdrop-blur-sm"
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 sm:gap-8 md:grid-cols-2">
         {sliders.map((slider) => (
           <div key={slider.key} className="space-y-3 sm:space-y-4">
             <div>
               <label className="text-base sm:text-lg font-medium text-white">
                 {slider.label}
+                {hasCustomTuning && (
+                  <span className="ml-2 text-xs text-yellow-400">
+                    Fine-tuned
+                  </span>
+                )}
               </label>
               <p className="text-xs sm:text-sm text-gray-400 mt-1">{slider.description}</p>
             </div>
@@ -176,6 +224,13 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
           <div className="text-xs text-gray-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
             <Crown className="w-3 h-3 text-yellow-400 inline mr-1" />
             Upgrade to Pro for tone presets
+          </div>
+        )}
+
+        {hasTonePresets && !hasCustomTuning && (
+          <div className="text-xs text-gray-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
+            <Star className="w-3 h-3 text-yellow-400 inline mr-1" />
+            Upgrade to Premium for custom fine-tuning
           </div>
         )}
       </div>

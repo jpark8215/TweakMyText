@@ -67,18 +67,18 @@ const pricingTiers: PricingTier[] = [
     credits: 300,
     features: [
       '300 rewrites per month',
-      'Premium style analysis with confidence scoring',
+      'Extended style analysis with confidence scoring',
       'Fastest processing (3x speed)',
-      'Save unlimited writing samples',
-      'Unlimited exports in multiple formats',
-      'Custom tone presets & fine-tuning',
+      'Save up to 100 writing samples',
+      'Unlimited exports & rewrite history (up to 300 rewrites)',
+      'Custom tone fine-tuning with advanced presets',
       'Full rewrite history with analytics',
       'Bulk rewrite operations',
       'Priority email support',
       'Early access to new features'
     ],
     limits: {
-      writingSamples: -1, // Unlimited
+      writingSamples: 100, // Updated to 100 for premium tier
       dailyRewrites: -1, // No daily limit
       monthlyRewrites: 300,
       monthlyExports: -1, // Unlimited
@@ -198,7 +198,7 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
                 <div className="space-y-1 text-gray-300">
                   <div>Free: Up to 3 samples</div>
                   <div>Pro: Up to 25 samples</div>
-                  <div>Premium: Unlimited samples</div>
+                  <div>Premium: Up to 100 samples</div>
                 </div>
               </div>
               <div className="space-y-2">

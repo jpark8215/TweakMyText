@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown } from 'lucide-react';
+import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown, Star } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
 import { rewriteText, analyzeToneFromSamples } from '../utils/styleAnalyzer';
 import { useAuth } from '../hooks/useAuth';
@@ -35,7 +35,16 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
   }, [samples]);
 
   const getSubscriptionLimits = () => {
-    if (!user) return { dailyLimit: 0, monthlyLimit: 0, exportLimit: 0, hasAdvancedAnalysis: false, hasPriorityProcessing: false, hasTonePresets: false };
+    if (!user) return { 
+      dailyLimit: 0, 
+      monthlyLimit: 0, 
+      exportLimit: 0, 
+      hasAdvancedAnalysis: false, 
+      hasPriorityProcessing: false, 
+      hasTonePresets: false,
+      hasExtendedAnalysis: false,
+      hasCustomTuning: false
+    };
     
     switch (user.subscription_tier) {
       case 'pro':
@@ -45,7 +54,9 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           exportLimit: 200,
           hasAdvancedAnalysis: true,
           hasPriorityProcessing: true,
-          hasTonePresets: true
+          hasTonePresets: true,
+          hasExtendedAnalysis: false,
+          hasCustomTuning: false
         };
       case 'premium':
         return { 
@@ -54,7 +65,9 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           exportLimit: -1, // Unlimited
           hasAdvancedAnalysis: true,
           hasPriorityProcessing: true,
-          hasTonePresets: true
+          hasTonePresets: true,
+          hasExtendedAnalysis: true, // Extended style analysis
+          hasCustomTuning: true // Custom tone fine-tuning
         };
       default: // free
         return { 
@@ -63,7 +76,9 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           exportLimit: 5,
           hasAdvancedAnalysis: false,
           hasPriorityProcessing: false,
-          hasTonePresets: false
+          hasTonePresets: false,
+          hasExtendedAnalysis: false,
+          hasCustomTuning: false
         };
     }
   };
@@ -95,8 +110,8 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     setIsRewriting(true);
     try {
       // Simulate priority processing for Pro/Premium users
-      const processingDelay = user.subscription_tier === 'premium' ? 1000 : 
-                             user.subscription_tier === 'pro' ? 1500 : 2000;
+      const processingDelay = user.subscription_tier === 'premium' ? 800 : // 3x faster
+                             user.subscription_tier === 'pro' ? 1200 : 2000; // 2x faster vs standard
       
       const rewriteResult = await rewriteText(inputText, samples, toneSettings);
       
@@ -162,7 +177,8 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       timestamp: result.timestamp,
       samples: samples.map(s => ({ title: s.title, preview: s.content.substring(0, 100) + '...' })),
       tier: user.subscription_tier,
-      analysisType: limits.hasAdvancedAnalysis ? 'Advanced' : 'Basic'
+      analysisType: limits.hasExtendedAnalysis ? 'Extended' : limits.hasAdvancedAnalysis ? 'Advanced' : 'Basic',
+      processingPriority: limits.hasPriorityProcessing ? (user.subscription_tier === 'premium' ? '3x Speed' : '2x Speed') : 'Standard'
     };
     
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -217,9 +233,15 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           </h1>
           <p className="text-gray-300 text-sm sm:text-base lg:text-lg">
             Transform any text to match your writing style
-            {limits.hasAdvancedAnalysis && (
+            {limits.hasExtendedAnalysis && (
+              <span className="block text-yellow-400 text-xs mt-1 flex items-center justify-center gap-1">
+                <Star className="w-3 h-3" />
+                Extended Analysis {limits.hasPriorityProcessing && '• Fastest Processing (3x)'}
+              </span>
+            )}
+            {limits.hasAdvancedAnalysis && !limits.hasExtendedAnalysis && (
               <span className="block text-cyan-400 text-xs mt-1">
-                ✨ Advanced Analysis {limits.hasPriorityProcessing && '• Priority Processing'}
+                ✨ Advanced Analysis {limits.hasPriorityProcessing && '• Priority Processing (2x)'}
               </span>
             )}
           </p>
@@ -250,6 +272,9 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             Tone Controls
             {limits.hasTonePresets && (
               <Crown className="w-3 h-3 text-yellow-400" />
+            )}
+            {limits.hasCustomTuning && (
+              <Star className="w-3 h-3 text-yellow-400" />
             )}
           </button>
         </div>
@@ -362,7 +387,9 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           {limits.hasPriorityProcessing && (
             <div className="flex items-center gap-1 px-2 py-1 bg-cyan-500/20 rounded-full">
               <Crown className="w-3 h-3 text-cyan-400" />
-              <span className="text-xs text-cyan-300">Priority</span>
+              <span className="text-xs text-cyan-300">
+                {user?.subscription_tier === 'premium' ? 'Fastest (3x)' : 'Priority (2x)'}
+              </span>
             </div>
           )}
         </div>
@@ -398,7 +425,10 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
               {isRewriting ? (
                 <>
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                  {limits.hasPriorityProcessing ? 'Processing (Priority)...' : 'Rewriting...'}
+                  {limits.hasPriorityProcessing ? 
+                    (user?.subscription_tier === 'premium' ? 'Processing (Fastest)...' : 'Processing (Priority)...') : 
+                    'Rewriting...'
+                  }
                 </>
               ) : (
                 <>

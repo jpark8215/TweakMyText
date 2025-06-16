@@ -31,11 +31,11 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
     
     switch (user.subscription_tier) {
       case 'premium':
-        return { maxSamples: Infinity, canSave: true };
+        return { maxSamples: 100, canSave: true }; // Updated to 100 for premium tier
       case 'pro':
-        return { maxSamples: 25, canSave: true }; // Updated to 25 for pro tier
+        return { maxSamples: 25, canSave: true };
       default:
-        return { maxSamples: 3, canSave: true }; // Updated to 3 for free tier
+        return { maxSamples: 3, canSave: true };
     }
   };
 
@@ -78,9 +78,9 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
     // Check subscription limits
     if (samples.length >= limits.maxSamples) {
       const upgradeMessage = user?.subscription_tier === 'free' 
-        ? 'Upgrade to Pro for 25 samples or Premium for unlimited samples.'
+        ? 'Upgrade to Pro for 25 samples or Premium for 100 samples.'
         : user?.subscription_tier === 'pro'
-        ? 'Upgrade to Premium for unlimited samples.'
+        ? 'Upgrade to Premium for 100 samples.'
         : 'Please delete some samples to add new ones.';
       
       setError(`You've reached your limit of ${limits.maxSamples} writing samples. ${upgradeMessage}`);
@@ -240,6 +240,8 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
             <p className="text-xs text-gray-400">
               {limits.maxSamples === Infinity 
                 ? `${samples.length} samples saved (Unlimited)`
+                : limits.maxSamples === 100
+                ? `${samples.length}/${limits.maxSamples} samples used (Premium)`
                 : `${samples.length}/${limits.maxSamples} samples used`
               }
             </p>
@@ -248,7 +250,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
       </div>
 
       {/* Subscription Limit Warning */}
-      {user && samples.length >= limits.maxSamples - 1 && limits.maxSamples !== Infinity && (
+      {user && samples.length >= limits.maxSamples - 5 && limits.maxSamples !== Infinity && (
         <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
@@ -266,12 +268,12 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
                 }
                 {user.subscription_tier === 'free' && (
                   <span className="block mt-1">
-                    Upgrade to Pro for 25 samples or Premium for unlimited samples.
+                    Upgrade to Pro for 25 samples or Premium for 100 samples.
                   </span>
                 )}
                 {user.subscription_tier === 'pro' && (
                   <span className="block mt-1">
-                    Upgrade to Premium for unlimited samples.
+                    Upgrade to Premium for 100 samples.
                   </span>
                 )}
               </p>
