@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock } from 'lucide-react';
+import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
 import { rewriteText, analyzeToneFromSamples } from '../utils/styleAnalyzer';
 import { useAuth } from '../hooks/useAuth';
@@ -24,7 +24,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     technicality: 50
   });
 
-  const { user, updateCredits } = useAuth();
+  const { user, updateCredits, updateExports } = useAuth();
 
   // Analyze samples and set initial tone settings when component mounts or samples change
   useEffect(() => {
@@ -33,6 +33,42 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       setToneSettings(analyzedTone);
     }
   }, [samples]);
+
+  const getSubscriptionLimits = () => {
+    if (!user) return { dailyLimit: 0, monthlyLimit: 0, exportLimit: 0, hasAdvancedAnalysis: false, hasPriorityProcessing: false, hasTonePresets: false };
+    
+    switch (user.subscription_tier) {
+      case 'pro':
+        return { 
+          dailyLimit: -1, // No daily limit
+          monthlyLimit: 200, 
+          exportLimit: 200,
+          hasAdvancedAnalysis: true,
+          hasPriorityProcessing: true,
+          hasTonePresets: true
+        };
+      case 'premium':
+        return { 
+          dailyLimit: -1, // No daily limit
+          monthlyLimit: 300, 
+          exportLimit: -1, // Unlimited
+          hasAdvancedAnalysis: true,
+          hasPriorityProcessing: true,
+          hasTonePresets: true
+        };
+      default: // free
+        return { 
+          dailyLimit: 3, 
+          monthlyLimit: 90, 
+          exportLimit: 5,
+          hasAdvancedAnalysis: false,
+          hasPriorityProcessing: false,
+          hasTonePresets: false
+        };
+    }
+  };
+
+  const limits = getSubscriptionLimits();
 
   const handleRewrite = async () => {
     if (!inputText.trim() || !user) return;
@@ -49,15 +85,24 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       return;
     }
 
-    // Check monthly limit for free users
-    if (user.subscription_tier === 'free' && user.monthly_credits_used >= 90) {
-      alert('You have reached your monthly limit of 90 rewrites. Limit resets on your signup anniversary.');
+    // Check monthly limit
+    const monthlyLimit = limits.monthlyLimit;
+    if (user.monthly_credits_used >= monthlyLimit) {
+      alert(`You have reached your monthly limit of ${monthlyLimit} rewrites. ${user.subscription_tier === 'free' ? 'Upgrade to Pro or Premium for more credits.' : 'Limit resets on your signup anniversary.'}`);
       return;
     }
     
     setIsRewriting(true);
     try {
+      // Simulate priority processing for Pro/Premium users
+      const processingDelay = user.subscription_tier === 'premium' ? 1000 : 
+                             user.subscription_tier === 'pro' ? 1500 : 2000;
+      
       const rewriteResult = await rewriteText(inputText, samples, toneSettings);
+      
+      // Add processing delay simulation
+      await new Promise(resolve => setTimeout(resolve, processingDelay));
+      
       setResult(rewriteResult);
 
       // Deduct credits and save to database
@@ -91,14 +136,20 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     navigator.clipboard.writeText(text);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!result || !user) return;
     
-    // Check export limits for free users
+    // Check export limits
     if (user.subscription_tier === 'free') {
       const monthlyExportsUsed = user.monthly_exports_used || 0;
       if (monthlyExportsUsed >= 5) {
-        alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for unlimited exports.');
+        alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for more exports.');
+        return;
+      }
+    } else if (user.subscription_tier === 'pro') {
+      const monthlyExportsUsed = user.monthly_exports_used || 0;
+      if (monthlyExportsUsed >= 200) {
+        alert('You have reached your monthly export limit of 200. Upgrade to Premium for unlimited exports.');
         return;
       }
     }
@@ -109,7 +160,9 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       confidence: result.confidence,
       styleTags: result.styleTags,
       timestamp: result.timestamp,
-      samples: samples.map(s => ({ title: s.title, preview: s.content.substring(0, 100) + '...' }))
+      samples: samples.map(s => ({ title: s.title, preview: s.content.substring(0, 100) + '...' })),
+      tier: user.subscription_tier,
+      analysisType: limits.hasAdvancedAnalysis ? 'Advanced' : 'Basic'
     };
     
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -120,18 +173,23 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     a.click();
     URL.revokeObjectURL(url);
 
-    // Update export count for free users
-    if (user.subscription_tier === 'free') {
-      // In a real app, you would update this in the database
-      console.log('Export count updated');
+    // Update export count
+    if (user.subscription_tier !== 'premium') {
+      const { error } = await updateExports(1);
+      if (error) {
+        console.error('Failed to update export count:', error);
+      }
     }
   };
 
   const canRewrite = user && user.credits_remaining > 0 && inputText.trim() && 
-    (user.subscription_tier !== 'free' || (user.daily_credits_used < 3 && user.monthly_credits_used < 90));
+    (user.subscription_tier !== 'free' || (user.daily_credits_used < 3 && user.monthly_credits_used < 90)) &&
+    user.monthly_credits_used < limits.monthlyLimit;
 
   const canExport = user && result && 
-    (user.subscription_tier !== 'free' || (user.monthly_exports_used || 0) < 5);
+    (user.subscription_tier === 'premium' || 
+     (user.subscription_tier === 'pro' && (user.monthly_exports_used || 0) < 200) ||
+     (user.subscription_tier === 'free' && (user.monthly_exports_used || 0) < 5));
 
   const getTimeUntilReset = () => {
     const now = new Date();
@@ -157,7 +215,14 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent mb-1 sm:mb-2">
             Style Rewriter
           </h1>
-          <p className="text-gray-300 text-sm sm:text-base lg:text-lg">Transform any text to match your writing style</p>
+          <p className="text-gray-300 text-sm sm:text-base lg:text-lg">
+            Transform any text to match your writing style
+            {limits.hasAdvancedAnalysis && (
+              <span className="block text-cyan-400 text-xs mt-1">
+                ✨ Advanced Analysis {limits.hasPriorityProcessing && '• Priority Processing'}
+              </span>
+            )}
+          </p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -170,6 +235,11 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
                   ({user.daily_credits_used}/3 today)
                 </span>
               )}
+              {user.subscription_tier !== 'free' && (
+                <span className="text-xs text-gray-400">
+                  ({user.monthly_credits_used}/{limits.monthlyLimit} month)
+                </span>
+              )}
             </div>
           )}
           <button
@@ -178,12 +248,15 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           >
             <Sliders className="w-4 h-4" />
             Tone Controls
+            {limits.hasTonePresets && (
+              <Crown className="w-3 h-3 text-yellow-400" />
+            )}
           </button>
         </div>
       </div>
 
       {/* Credits Warning */}
-      {user && user.subscription_tier === 'free' && (
+      {user && (
         <div className="mb-6 sm:mb-8 space-y-4">
           {user.credits_remaining === 0 && (
             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
@@ -192,14 +265,17 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
                 <div>
                   <p className="text-red-300 font-medium">No credits remaining</p>
                   <p className="text-red-400/80 text-sm">
-                    Your daily credits will reset in {getTimeUntilReset()} hours at midnight UTC.
+                    {user.subscription_tier === 'free' 
+                      ? `Your daily credits will reset in ${getTimeUntilReset()} hours at midnight UTC.`
+                      : 'Your monthly credits will reset on your signup anniversary.'
+                    }
                   </p>
                 </div>
               </div>
             </div>
           )}
           
-          {user.daily_credits_used >= 3 && user.credits_remaining > 0 && (
+          {user.subscription_tier === 'free' && user.daily_credits_used >= 3 && user.credits_remaining > 0 && (
             <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-yellow-400 flex-shrink-0" />
@@ -213,13 +289,13 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             </div>
           )}
 
-          {user.monthly_credits_used >= 75 && user.monthly_credits_used < 90 && (
+          {user.monthly_credits_used >= limits.monthlyLimit - 10 && user.monthly_credits_used < limits.monthlyLimit && (
             <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
               <div className="flex items-center gap-3">
                 <Calendar className="w-5 h-5 text-orange-400 flex-shrink-0" />
                 <div>
                   <p className="text-orange-300 font-medium">
-                    {90 - user.monthly_credits_used} credits left this month
+                    {limits.monthlyLimit - user.monthly_credits_used} credits left this month
                   </p>
                   <p className="text-orange-400/80 text-sm">
                     Monthly limit resets on day {user.monthly_reset_date} of each month.
@@ -229,14 +305,14 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             </div>
           )}
 
-          {user.monthly_credits_used >= 90 && (
+          {user.monthly_credits_used >= limits.monthlyLimit && (
             <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
               <div className="flex items-center gap-3">
                 <Calendar className="w-5 h-5 text-red-400 flex-shrink-0" />
                 <div>
                   <p className="text-red-300 font-medium">Monthly limit reached</p>
                   <p className="text-red-400/80 text-sm">
-                    You've used all 90 monthly credits. Limit resets on day {user.monthly_reset_date}.
+                    You've used all {limits.monthlyLimit} monthly credits. Limit resets on day {user.monthly_reset_date}.
                   </p>
                 </div>
               </div>
@@ -244,16 +320,19 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           )}
 
           {/* Export limit warning */}
-          {(user.monthly_exports_used || 0) >= 4 && (
+          {user.subscription_tier !== 'premium' && (user.monthly_exports_used || 0) >= limits.exportLimit - 2 && (
             <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
               <div className="flex items-center gap-3">
                 <Download className="w-5 h-5 text-purple-400 flex-shrink-0" />
                 <div>
                   <p className="text-purple-300 font-medium">
-                    {5 - (user.monthly_exports_used || 0)} exports left this month
+                    {limits.exportLimit - (user.monthly_exports_used || 0)} exports left this month
                   </p>
                   <p className="text-purple-400/80 text-sm">
-                    Free users can export up to 5 results per month. Upgrade for unlimited exports.
+                    {user.subscription_tier === 'free' 
+                      ? 'Free users can export up to 5 results per month. Upgrade for more exports.'
+                      : 'Pro users can export up to 200 results per month. Upgrade to Premium for unlimited exports.'
+                    }
                   </p>
                 </div>
               </div>
@@ -280,6 +359,12 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             <Send className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
           <h3 className="text-lg sm:text-xl font-semibold text-white">Input Text</h3>
+          {limits.hasPriorityProcessing && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-cyan-500/20 rounded-full">
+              <Crown className="w-3 h-3 text-cyan-400" />
+              <span className="text-xs text-cyan-300">Priority</span>
+            </div>
+          )}
         </div>
         
         <textarea
@@ -313,7 +398,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
               {isRewriting ? (
                 <>
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                  Rewriting...
+                  {limits.hasPriorityProcessing ? 'Processing (Priority)...' : 'Rewriting...'}
                 </>
               ) : (
                 <>
@@ -322,6 +407,11 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
                   {user && user.subscription_tier === 'free' && (
                     <span className="text-xs opacity-75">
                       ({user.credits_remaining} left today)
+                    </span>
+                  )}
+                  {user && user.subscription_tier !== 'free' && (
+                    <span className="text-xs opacity-75">
+                      ({limits.monthlyLimit - user.monthly_credits_used} left)
                     </span>
                   )}
                 </>
@@ -355,6 +445,16 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
               {user && user.subscription_tier === 'free' && (
                 <span className="text-xs opacity-75">
                   ({5 - (user.monthly_exports_used || 0)} left)
+                </span>
+              )}
+              {user && user.subscription_tier === 'pro' && (
+                <span className="text-xs opacity-75">
+                  ({200 - (user.monthly_exports_used || 0)} left)
+                </span>
+              )}
+              {user && user.subscription_tier === 'premium' && (
+                <span className="text-xs opacity-75">
+                  (Unlimited)
                 </span>
               )}
             </button>

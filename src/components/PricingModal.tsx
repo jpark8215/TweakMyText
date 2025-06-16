@@ -19,7 +19,18 @@ const pricingTiers: PricingTier[] = [
       'Basic style analysis',
       'Save up to 3 writing samples',
       'Export results (limited to 5 rewrites per month)'
-    ]
+    ],
+    limits: {
+      writingSamples: 3,
+      dailyRewrites: 3,
+      monthlyRewrites: 90,
+      monthlyExports: 5,
+      processingSpeed: 1,
+      exportFormats: ['JSON'],
+      historyAccess: false,
+      bulkOperations: false,
+      support: 'community'
+    }
   },
   {
     id: 'pro',
@@ -29,14 +40,25 @@ const pricingTiers: PricingTier[] = [
     features: [
       '200 rewrites per month',
       'Advanced style analysis',
-      'Save up to 25 writing samples',
       'Priority processing (2x faster)',
-      'Advanced tone controls',
-      'Export results (JSON & TXT)',
+      'Save up to 25 writing samples',
+      'Export results (up to 200 rewrites)',
+      'Access to basic tone presets',
       'Rewrite history access',
       'Email support'
     ],
-    popular: true
+    popular: true,
+    limits: {
+      writingSamples: 25,
+      dailyRewrites: -1, // No daily limit
+      monthlyRewrites: 200,
+      monthlyExports: 200,
+      processingSpeed: 2,
+      exportFormats: ['JSON', 'TXT'],
+      historyAccess: true,
+      bulkOperations: false,
+      support: 'email'
+    }
   },
   {
     id: 'premium',
@@ -46,15 +68,26 @@ const pricingTiers: PricingTier[] = [
     features: [
       '300 rewrites per month',
       'Premium style analysis with confidence scoring',
-      'Save unlimited writing samples',
       'Fastest processing (3x speed)',
+      'Save unlimited writing samples',
+      'Unlimited exports in multiple formats',
       'Custom tone presets & fine-tuning',
-      'Export in multiple formats (JSON, TXT, DOCX)',
       'Full rewrite history with analytics',
       'Bulk rewrite operations',
       'Priority email support',
       'Early access to new features'
-    ]
+    ],
+    limits: {
+      writingSamples: -1, // Unlimited
+      dailyRewrites: -1, // No daily limit
+      monthlyRewrites: 300,
+      monthlyExports: -1, // Unlimited
+      processingSpeed: 3,
+      exportFormats: ['JSON', 'TXT', 'DOCX'],
+      historyAccess: true,
+      bulkOperations: true,
+      support: 'priority'
+    }
   }
 ];
 
@@ -180,8 +213,8 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
                 <h4 className="font-medium text-pink-400">Export Options</h4>
                 <div className="space-y-1 text-gray-300">
                   <div>Free: Limited (5/month)</div>
-                  <div>Pro: JSON & TXT formats</div>
-                  <div>Premium: All formats + DOCX</div>
+                  <div>Pro: Up to 200/month (JSON & TXT)</div>
+                  <div>Premium: Unlimited (All formats)</div>
                 </div>
               </div>
             </div>

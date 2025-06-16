@@ -117,14 +117,28 @@ export const useAuth = () => {
   const updateCredits = async (creditsUsed: number) => {
     if (!user) return { error: new Error('No user found') };
 
-    // Check daily and monthly limits for free users
+    // Get subscription limits
+    const getSubscriptionLimits = () => {
+      switch (user.subscription_tier) {
+        case 'pro':
+          return { dailyLimit: -1, monthlyLimit: 200 }; // No daily limit for Pro
+        case 'premium':
+          return { dailyLimit: -1, monthlyLimit: 300 }; // No daily limit for Premium
+        default:
+          return { dailyLimit: 3, monthlyLimit: 90 }; // Free tier
+      }
+    };
+
+    const limits = getSubscriptionLimits();
+
+    // Check daily and monthly limits
     if (user.subscription_tier === 'free') {
       const today = new Date().toISOString().split('T')[0];
       const currentDay = new Date().getDate();
       
       // Reset daily credits if it's a new day
       if (user.last_credit_reset !== today) {
-        const maxDailyCredits = Math.min(3, 90 - user.monthly_credits_used);
+        const maxDailyCredits = Math.min(3, limits.monthlyLimit - user.monthly_credits_used);
         await supabase
           .from('users')
           .update({ 
@@ -164,13 +178,18 @@ export const useAuth = () => {
       }
 
       // Check if user has exceeded monthly limit
-      if (user.monthly_credits_used >= 90) {
-        return { error: new Error('Monthly credit limit reached (90 credits)') };
+      if (user.monthly_credits_used >= limits.monthlyLimit) {
+        return { error: new Error(`Monthly credit limit reached (${limits.monthlyLimit} credits)`) };
       }
 
       // Check if user has exceeded daily limit
-      if (user.daily_credits_used >= 3) {
-        return { error: new Error('Daily credit limit reached (3 credits)') };
+      if (user.daily_credits_used >= limits.dailyLimit) {
+        return { error: new Error(`Daily credit limit reached (${limits.dailyLimit} credits)`) };
+      }
+    } else {
+      // For Pro/Premium users, only check monthly limits
+      if (user.monthly_credits_used >= limits.monthlyLimit) {
+        return { error: new Error(`Monthly credit limit reached (${limits.monthlyLimit} credits)`) };
       }
     }
 
@@ -202,27 +221,41 @@ export const useAuth = () => {
   const updateExports = async (exportsUsed: number) => {
     if (!user) return { error: new Error('No user found') };
 
-    // Only track exports for free users
-    if (user.subscription_tier === 'free') {
-      const newExportsUsed = (user.monthly_exports_used || 0) + exportsUsed;
-      
-      if (newExportsUsed > 5) {
-        return { error: new Error('Monthly export limit reached (5 exports)') };
+    // Get export limits based on subscription tier
+    const getExportLimits = () => {
+      switch (user.subscription_tier) {
+        case 'pro':
+          return { monthlyLimit: 200 };
+        case 'premium':
+          return { monthlyLimit: -1 }; // Unlimited
+        default:
+          return { monthlyLimit: 5 }; // Free tier
       }
+    };
 
-      const { error } = await supabase
-        .from('users')
-        .update({ monthly_exports_used: newExportsUsed })
-        .eq('id', user.id);
+    const limits = getExportLimits();
 
-      if (!error) {
-        setUser({ ...user, monthly_exports_used: newExportsUsed });
-      }
-
-      return { error };
+    // Check if unlimited exports (Premium)
+    if (limits.monthlyLimit === -1) {
+      return { error: null };
     }
 
-    return { error: null };
+    const newExportsUsed = (user.monthly_exports_used || 0) + exportsUsed;
+    
+    if (newExportsUsed > limits.monthlyLimit) {
+      return { error: new Error(`Monthly export limit reached (${limits.monthlyLimit} exports)`) };
+    }
+
+    const { error } = await supabase
+      .from('users')
+      .update({ monthly_exports_used: newExportsUsed })
+      .eq('id', user.id);
+
+    if (!error) {
+      setUser({ ...user, monthly_exports_used: newExportsUsed });
+    }
+
+    return { error };
   };
 
   return {

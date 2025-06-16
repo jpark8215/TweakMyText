@@ -33,7 +33,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
       case 'premium':
         return { maxSamples: Infinity, canSave: true };
       case 'pro':
-        return { maxSamples: 25, canSave: true };
+        return { maxSamples: 25, canSave: true }; // Updated to 25 for pro tier
       default:
         return { maxSamples: 3, canSave: true }; // Updated to 3 for free tier
     }
@@ -77,7 +77,13 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
 
     // Check subscription limits
     if (samples.length >= limits.maxSamples) {
-      setError(`You've reached your limit of ${limits.maxSamples} writing samples. ${user?.subscription_tier === 'free' ? 'Upgrade to Pro for 25 samples or Premium for unlimited samples.' : 'Please delete some samples to add new ones.'}`);
+      const upgradeMessage = user?.subscription_tier === 'free' 
+        ? 'Upgrade to Pro for 25 samples or Premium for unlimited samples.'
+        : user?.subscription_tier === 'pro'
+        ? 'Upgrade to Premium for unlimited samples.'
+        : 'Please delete some samples to add new ones.';
+      
+      setError(`You've reached your limit of ${limits.maxSamples} writing samples. ${upgradeMessage}`);
       return;
     }
 
@@ -261,6 +267,11 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
                 {user.subscription_tier === 'free' && (
                   <span className="block mt-1">
                     Upgrade to Pro for 25 samples or Premium for unlimited samples.
+                  </span>
+                )}
+                {user.subscription_tier === 'pro' && (
+                  <span className="block mt-1">
+                    Upgrade to Premium for unlimited samples.
                   </span>
                 )}
               </p>
