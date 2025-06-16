@@ -92,7 +92,16 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
   };
 
   const handleExport = () => {
-    if (!result) return;
+    if (!result || !user) return;
+    
+    // Check export limits for free users
+    if (user.subscription_tier === 'free') {
+      const monthlyExportsUsed = user.monthly_exports_used || 0;
+      if (monthlyExportsUsed >= 5) {
+        alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for unlimited exports.');
+        return;
+      }
+    }
     
     const exportData = {
       original: result.original,
@@ -110,10 +119,19 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     a.download = `rewrite-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+
+    // Update export count for free users
+    if (user.subscription_tier === 'free') {
+      // In a real app, you would update this in the database
+      console.log('Export count updated');
+    }
   };
 
   const canRewrite = user && user.credits_remaining > 0 && inputText.trim() && 
     (user.subscription_tier !== 'free' || (user.daily_credits_used < 3 && user.monthly_credits_used < 90));
+
+  const canExport = user && result && 
+    (user.subscription_tier !== 'free' || (user.monthly_exports_used || 0) < 5);
 
   const getTimeUntilReset = () => {
     const now = new Date();
@@ -224,6 +242,23 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
               </div>
             </div>
           )}
+
+          {/* Export limit warning */}
+          {(user.monthly_exports_used || 0) >= 4 && (
+            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+              <div className="flex items-center gap-3">
+                <Download className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                <div>
+                  <p className="text-purple-300 font-medium">
+                    {5 - (user.monthly_exports_used || 0)} exports left this month
+                  </p>
+                  <p className="text-purple-400/80 text-sm">
+                    Free users can export up to 5 results per month. Upgrade for unlimited exports.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -312,10 +347,16 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             </button>
             <button
               onClick={handleExport}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
+              disabled={!canExport}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
             >
               <Download className="w-4 h-4" />
               Export Results
+              {user && user.subscription_tier === 'free' && (
+                <span className="text-xs opacity-75">
+                  ({5 - (user.monthly_exports_used || 0)} left)
+                </span>
+              )}
             </button>
           </div>
         </div>

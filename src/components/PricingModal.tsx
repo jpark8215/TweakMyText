@@ -14,12 +14,11 @@ const pricingTiers: PricingTier[] = [
     price: 0,
     credits: 90,
     features: [
-      '3 rewrites per day (90 per month max)',
+      '3 rewrites per day (90 per month)',
+      '5 rewrites per month for export',
       'Basic style analysis',
-      'Save up to 5 writing samples',
-      'Standard processing speed',
-      'Basic tone controls',
-      'Export results (JSON format)'
+      'Save up to 3 writing samples',
+      'Export results (limited to 5 rewrites per month)'
     ]
   },
   {
@@ -164,7 +163,7 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
               <div className="space-y-2">
                 <h4 className="font-medium text-cyan-400">Writing Samples</h4>
                 <div className="space-y-1 text-gray-300">
-                  <div>Free: Up to 5 samples</div>
+                  <div>Free: Up to 3 samples</div>
                   <div>Pro: Up to 25 samples</div>
                   <div>Premium: Unlimited samples</div>
                 </div>
@@ -180,7 +179,7 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
               <div className="space-y-2">
                 <h4 className="font-medium text-pink-400">Export Options</h4>
                 <div className="space-y-1 text-gray-300">
-                  <div>Free: JSON format only</div>
+                  <div>Free: Limited (5/month)</div>
                   <div>Pro: JSON & TXT formats</div>
                   <div>Premium: All formats + DOCX</div>
                 </div>

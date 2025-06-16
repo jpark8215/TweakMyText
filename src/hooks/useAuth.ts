@@ -53,6 +53,7 @@ export const useAuth = () => {
           credits_remaining: 3,
           daily_credits_used: 0,
           monthly_credits_used: 0,
+          monthly_exports_used: 0,
           last_credit_reset: new Date().toISOString().split('T')[0],
           monthly_reset_date: new Date().getDate(),
         };
@@ -147,6 +148,7 @@ export const useAuth = () => {
           .from('users')
           .update({ 
             monthly_credits_used: 0,
+            monthly_exports_used: 0,
             credits_remaining: 3,
             daily_credits_used: 0
           })
@@ -155,6 +157,7 @@ export const useAuth = () => {
         setUser({ 
           ...user, 
           monthly_credits_used: 0,
+          monthly_exports_used: 0,
           credits_remaining: 3,
           daily_credits_used: 0
         });
@@ -196,6 +199,32 @@ export const useAuth = () => {
     return { error };
   };
 
+  const updateExports = async (exportsUsed: number) => {
+    if (!user) return { error: new Error('No user found') };
+
+    // Only track exports for free users
+    if (user.subscription_tier === 'free') {
+      const newExportsUsed = (user.monthly_exports_used || 0) + exportsUsed;
+      
+      if (newExportsUsed > 5) {
+        return { error: new Error('Monthly export limit reached (5 exports)') };
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ monthly_exports_used: newExportsUsed })
+        .eq('id', user.id);
+
+      if (!error) {
+        setUser({ ...user, monthly_exports_used: newExportsUsed });
+      }
+
+      return { error };
+    }
+
+    return { error: null };
+  };
+
   return {
     user,
     loading,
@@ -203,5 +232,6 @@ export const useAuth = () => {
     signUp,
     signOut,
     updateCredits,
+    updateExports,
   };
 };

@@ -37,6 +37,7 @@ export interface User {
   credits_remaining: number;
   daily_credits_used: number;
   monthly_credits_used: number;
+  monthly_exports_used: number; // New field for tracking exports
   last_credit_reset: string;
   monthly_reset_date: number;
   subscription_expires_at?: Date;
@@ -52,6 +53,9 @@ export interface PricingTier {
   popular?: boolean;
   limits?: {
     writingSamples: number;
+    dailyRewrites: number;
+    monthlyRewrites: number;
+    monthlyExports: number; // New field for export limits
     processingSpeed: number; // multiplier (1x, 2x, 3x)
     exportFormats: string[];
     historyAccess: boolean;
@@ -68,8 +72,9 @@ export interface UsageStats {
 
 export interface SubscriptionLimits {
   maxWritingSamples: number;
-  dailyRewriteLimit?: number;
+  dailyRewriteLimit: number;
   monthlyRewriteLimit: number;
+  monthlyExportLimit: number; // New field for export limits
   processingPriority: 'standard' | 'high' | 'premium';
   exportFormats: string[];
   historyRetention: number; // days

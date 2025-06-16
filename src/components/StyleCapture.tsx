@@ -27,7 +27,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
   }, [user]);
 
   const getSubscriptionLimits = () => {
-    if (!user) return { maxSamples: 5, canSave: false };
+    if (!user) return { maxSamples: 3, canSave: false };
     
     switch (user.subscription_tier) {
       case 'premium':
@@ -35,7 +35,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
       case 'pro':
         return { maxSamples: 25, canSave: true };
       default:
-        return { maxSamples: 5, canSave: true };
+        return { maxSamples: 3, canSave: true }; // Updated to 3 for free tier
     }
   };
 
