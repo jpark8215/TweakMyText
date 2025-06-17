@@ -39,14 +39,14 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
           name: 'Pro',
           price: '$4.99/month',
           credits: '200 credits/month',
-          color: 'from-cyan-400 to-blue-500'
+          color: 'from-blue-500 to-indigo-500'
         };
       case 'premium':
         return {
           name: 'Premium',
           price: '$7.99/month',
           credits: '300 credits/month',
-          color: 'from-yellow-400 to-orange-500'
+          color: 'from-amber-500 to-orange-500'
         };
       default:
         return {
@@ -65,54 +65,54 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
       <div className="flex items-center gap-4 mb-8">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white transition-colors hover:bg-white/10 rounded-lg"
+          className="inline-flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors hover:bg-gray-100 rounded-lg"
         >
           <ArrowLeft className="w-5 h-5" />
           Back
         </button>
-        <h1 className="text-2xl font-bold text-white">Subscription Management</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Subscription Management</h1>
       </div>
 
       {/* Current Plan */}
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 sm:p-8 mb-8">
+      <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200 p-6 sm:p-8 mb-8 shadow-lg">
         <div className="flex items-center gap-4 mb-6">
           <div className={`w-12 h-12 bg-gradient-to-br ${tierInfo.color} rounded-xl flex items-center justify-center`}>
             <Crown className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">{tierInfo.name} Plan</h2>
-            <p className="text-gray-300">{tierInfo.price}</p>
+            <h2 className="text-xl font-bold text-gray-800">{tierInfo.name} Plan</h2>
+            <p className="text-gray-600">{tierInfo.price}</p>
           </div>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white/5 rounded-xl p-4">
+          <div className="bg-gray-50 rounded-xl p-4">
             <div className="flex items-center gap-3 mb-2">
-              <CreditCard className="w-5 h-5 text-cyan-400" />
-              <span className="text-white font-medium">Credits</span>
+              <CreditCard className="w-5 h-5 text-blue-600" />
+              <span className="text-gray-800 font-medium">Credits</span>
             </div>
-            <p className="text-gray-300 text-sm">{tierInfo.credits}</p>
-            <p className="text-cyan-400 text-lg font-bold">{user.credits_remaining} remaining</p>
+            <p className="text-gray-600 text-sm">{tierInfo.credits}</p>
+            <p className="text-blue-600 text-lg font-bold">{user.credits_remaining} remaining</p>
           </div>
 
           {user.subscription_expires_at && (
-            <div className="bg-white/5 rounded-xl p-4">
+            <div className="bg-gray-50 rounded-xl p-4">
               <div className="flex items-center gap-3 mb-2">
-                <Calendar className="w-5 h-5 text-purple-400" />
-                <span className="text-white font-medium">Next Billing</span>
+                <Calendar className="w-5 h-5 text-indigo-600" />
+                <span className="text-gray-800 font-medium">Next Billing</span>
               </div>
-              <p className="text-gray-300 text-sm">
+              <p className="text-gray-600 text-sm">
                 {user.subscription_expires_at.toLocaleDateString()}
               </p>
             </div>
           )}
 
-          <div className="bg-white/5 rounded-xl p-4">
+          <div className="bg-gray-50 rounded-xl p-4">
             <div className="flex items-center gap-3 mb-2">
-              <Check className="w-5 h-5 text-emerald-400" />
-              <span className="text-white font-medium">Status</span>
+              <Check className="w-5 h-5 text-emerald-600" />
+              <span className="text-gray-800 font-medium">Status</span>
             </div>
-            <p className="text-emerald-400 font-medium">Active</p>
+            <p className="text-emerald-600 font-medium">Active</p>
           </div>
         </div>
 
@@ -120,7 +120,7 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
           {user.subscription_tier === 'free' ? (
             <button
               onClick={handleUpgrade}
-              className="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25"
+              className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25"
             >
               Upgrade Plan
             </button>
@@ -128,13 +128,13 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
             <>
               <button
                 onClick={handleUpgrade}
-                className="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25"
+                className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25"
               >
                 Change Plan
               </button>
               <button
                 onClick={() => setShowCancelConfirm(true)}
-                className="flex-1 py-3 bg-red-500/20 text-red-400 rounded-xl font-medium hover:bg-red-500/30 transition-all border border-red-500/30"
+                className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition-all border border-red-200"
               >
                 Cancel Subscription
               </button>
@@ -144,28 +144,28 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
       </div>
 
       {/* Billing History */}
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 sm:p-8">
-        <h3 className="text-lg font-bold text-white mb-6">Billing History</h3>
+      <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-lg">
+        <h3 className="text-lg font-bold text-gray-800 mb-6">Billing History</h3>
         <div className="space-y-4">
           {/* Mock billing history */}
-          <div className="flex items-center justify-between py-3 border-b border-white/10">
+          <div className="flex items-center justify-between py-3 border-b border-gray-200">
             <div>
-              <p className="text-white font-medium">{tierInfo.name} Plan</p>
-              <p className="text-gray-400 text-sm">December 1, 2024</p>
+              <p className="text-gray-800 font-medium">{tierInfo.name} Plan</p>
+              <p className="text-gray-500 text-sm">December 1, 2024</p>
             </div>
             <div className="text-right">
-              <p className="text-white font-medium">{tierInfo.price}</p>
-              <p className="text-emerald-400 text-sm">Paid</p>
+              <p className="text-gray-800 font-medium">{tierInfo.price}</p>
+              <p className="text-emerald-600 text-sm">Paid</p>
             </div>
           </div>
-          <div className="flex items-center justify-between py-3 border-b border-white/10">
+          <div className="flex items-center justify-between py-3 border-b border-gray-200">
             <div>
-              <p className="text-white font-medium">{tierInfo.name} Plan</p>
-              <p className="text-gray-400 text-sm">November 1, 2024</p>
+              <p className="text-gray-800 font-medium">{tierInfo.name} Plan</p>
+              <p className="text-gray-500 text-sm">November 1, 2024</p>
             </div>
             <div className="text-right">
-              <p className="text-white font-medium">{tierInfo.price}</p>
-              <p className="text-emerald-400 text-sm">Paid</p>
+              <p className="text-gray-800 font-medium">{tierInfo.price}</p>
+              <p className="text-emerald-600 text-sm">Paid</p>
             </div>
           </div>
         </div>
@@ -173,23 +173,23 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
 
       {/* Cancel Confirmation Modal */}
       {showCancelConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl border border-white/20 p-6 sm:p-8 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 w-full max-w-md shadow-2xl">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
-              <h3 className="text-xl font-bold text-white">Cancel Subscription</h3>
+              <h3 className="text-xl font-bold text-gray-800">Cancel Subscription</h3>
             </div>
 
-            <p className="text-gray-300 mb-6">
+            <p className="text-gray-600 mb-6">
               Are you sure you want to cancel your subscription? You'll lose access to premium features at the end of your billing period.
             </p>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCancelConfirm(false)}
-                className="flex-1 py-3 bg-white/10 text-white rounded-xl font-medium hover:bg-white/20 transition-all"
+                className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all"
               >
                 Keep Subscription
               </button>

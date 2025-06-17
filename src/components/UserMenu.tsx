@@ -40,9 +40,9 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
 
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case 'pro': return 'text-cyan-400';
-      case 'premium': return 'text-yellow-400';
-      default: return 'text-gray-400';
+      case 'pro': return 'text-blue-600';
+      case 'premium': return 'text-amber-600';
+      default: return 'text-gray-500';
     }
   };
 
@@ -58,13 +58,13 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition-all border border-white/20"
+        className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/80 hover:bg-white/90 transition-all border border-gray-200"
       >
-        <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-purple-500 rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
           <User className="w-4 h-4 text-white" />
         </div>
         <div className="hidden sm:block text-left">
-          <div className="text-white text-sm font-medium truncate max-w-32">
+          <div className="text-gray-800 text-sm font-medium truncate max-w-32">
             {user.email}
           </div>
           <div className={`text-xs ${getTierColor(user.subscription_tier)}`}>
@@ -79,14 +79,14 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
             className="fixed inset-0 z-10" 
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 top-full mt-2 w-64 bg-slate-900/95 backdrop-blur-xl rounded-xl border border-white/20 shadow-2xl z-20">
-            <div className="p-4 border-b border-white/10">
+          <div className="absolute right-0 top-full mt-2 w-64 bg-white/95 backdrop-blur-xl rounded-xl border border-gray-200 shadow-2xl z-20">
+            <div className="p-4 border-b border-gray-200">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-purple-500 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
                   <User className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-white font-medium truncate">
+                  <div className="text-gray-800 font-medium truncate">
                     {user.email}
                   </div>
                   <div className={`text-sm ${getTierColor(user.subscription_tier)}`}>
@@ -96,8 +96,8 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
               </div>
               
               <div className="flex items-center gap-2 text-sm">
-                <Zap className="w-4 h-4 text-yellow-400" />
-                <span className="text-gray-300">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span className="text-gray-700">
                   {user.credits_remaining} credits remaining
                 </span>
               </div>
@@ -106,7 +106,7 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
             <div className="p-2">
               <button
                 onClick={handleSettingsClick}
-                className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                className="w-full flex items-center gap-3 px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors text-left"
               >
                 <Settings className="w-4 h-4" />
                 Settings
@@ -114,7 +114,7 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
 
               <button
                 onClick={handleSubscriptionClick}
-                className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                className="w-full flex items-center gap-3 px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors text-left"
               >
                 <Crown className="w-4 h-4" />
                 Manage Subscription
@@ -123,18 +123,18 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
               {user.subscription_tier === 'free' && (
                 <button
                   onClick={handleUpgradeClick}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors text-left"
                 >
                   <Crown className="w-4 h-4" />
                   Upgrade Plan
                 </button>
               )}
               
-              <hr className="my-2 border-white/10" />
+              <hr className="my-2 border-gray-200" />
               
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-left"
+                className="w-full flex items-center gap-3 px-3 py-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left"
               >
                 <LogOut className="w-4 h-4" />
                 Sign Out

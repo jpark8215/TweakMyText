@@ -44,32 +44,32 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse shadow-lg">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <p className="text-gray-300">Loading...</p>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Header */}
-      <header className="bg-white/10 backdrop-blur-xl border-b border-white/20 sticky top-0 z-10">
+      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
                 <PenTool className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <div className="text-center sm:text-left">
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
                   TweakMyText
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-300">AI-Powered Writing Style Rewriter</p>
+                <p className="text-xs sm:text-sm text-gray-600">AI-Powered Writing Style Rewriter</p>
               </div>
             </div>
             
@@ -80,18 +80,18 @@ function App() {
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
                       currentView === 'capture' 
-                        ? 'bg-gradient-to-r from-cyan-400 to-purple-500 shadow-lg shadow-cyan-400/50' 
-                        : 'bg-gray-600'
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg shadow-blue-400/50' 
+                        : 'bg-gray-300'
                     }`} />
-                    <span className="text-xs sm:text-sm text-gray-300 font-medium">Capture</span>
+                    <span className="text-xs sm:text-sm text-gray-700 font-medium">Capture</span>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
                       currentView === 'rewrite' 
-                        ? 'bg-gradient-to-r from-cyan-400 to-purple-500 shadow-lg shadow-cyan-400/50' 
-                        : 'bg-gray-600'
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg shadow-blue-400/50' 
+                        : 'bg-gray-300'
                     }`} />
-                    <span className="text-xs sm:text-sm text-gray-300 font-medium">Rewrite</span>
+                    <span className="text-xs sm:text-sm text-gray-700 font-medium">Rewrite</span>
                   </div>
                 </div>
               )}
@@ -106,7 +106,7 @@ function App() {
               ) : (
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg font-medium hover:from-cyan-600 hover:to-purple-600 transition-all text-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-indigo-600 transition-all text-sm shadow-md hover:shadow-lg"
                 >
                   <LogIn className="w-4 h-4" />
                   Sign In
@@ -138,10 +138,10 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white/5 backdrop-blur-xl border-t border-white/10 mt-8 sm:mt-12 lg:mt-16">
+      <footer className="bg-white/60 backdrop-blur-xl border-t border-gray-200/50 mt-8 sm:mt-12 lg:mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <div className="flex items-center justify-center gap-3 text-gray-400">
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+          <div className="flex items-center justify-center gap-3 text-gray-600">
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
             <span className="text-xs sm:text-sm text-center">Transform any text to match your unique writing style</span>
           </div>
         </div>

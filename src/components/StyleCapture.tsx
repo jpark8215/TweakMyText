@@ -31,7 +31,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
     
     switch (user.subscription_tier) {
       case 'premium':
-        return { maxSamples: 100, canSave: true }; // Updated to 100 for premium tier
+        return { maxSamples: 100, canSave: true };
       case 'pro':
         return { maxSamples: 25, canSave: true };
       default:
@@ -211,10 +211,10 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center py-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500 rounded-2xl mb-4 animate-pulse">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-2xl mb-4 animate-pulse shadow-lg">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <p className="text-gray-300">Loading your writing samples...</p>
+          <p className="text-gray-600">Loading your writing samples...</p>
         </div>
       </div>
     );
@@ -223,21 +223,21 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-8 sm:mb-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500 rounded-2xl sm:rounded-3xl mb-4 sm:mb-6 shadow-2xl shadow-purple-500/25">
+        <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-2xl sm:rounded-3xl mb-4 sm:mb-6 shadow-2xl">
           <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
         </div>
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent mb-3 sm:mb-4 px-4">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-3 sm:mb-4 px-4">
           Capture Your Writing Style
         </h1>
-        <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed px-4">
+        <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed px-4">
           Add 2-3 samples of your writing so we can learn your unique voice and tone
         </p>
         {user && (
           <div className="mt-4 space-y-2">
-            <p className="text-sm text-cyan-400">
+            <p className="text-sm text-blue-600">
               ✨ Your samples are automatically saved to your account
             </p>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-500">
               {limits.maxSamples === Infinity 
                 ? `${samples.length} samples saved (Unlimited)`
                 : limits.maxSamples === 100
@@ -251,17 +251,17 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
 
       {/* Subscription Limit Warning */}
       {user && samples.length >= limits.maxSamples - 5 && limits.maxSamples !== Infinity && (
-        <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
             <div>
-              <p className="text-yellow-300 font-medium">
+              <p className="text-amber-800 font-medium">
                 {samples.length >= limits.maxSamples 
                   ? 'Sample limit reached' 
                   : 'Approaching sample limit'
                 }
               </p>
-              <p className="text-yellow-400/80 text-sm">
+              <p className="text-amber-700 text-sm">
                 {samples.length >= limits.maxSamples 
                   ? `You've reached your limit of ${limits.maxSamples} samples. Delete some samples or upgrade your plan.`
                   : `You can add ${limits.maxSamples - samples.length} more sample${limits.maxSamples - samples.length === 1 ? '' : 's'}.`
@@ -284,11 +284,11 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-          <p className="text-red-400 text-sm">{error}</p>
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-red-600 text-sm">{error}</p>
           <button
             onClick={() => setError(null)}
-            className="text-red-300 hover:text-red-200 text-xs mt-1 underline"
+            className="text-red-500 hover:text-red-600 text-xs mt-1 underline"
           >
             Dismiss
           </button>
@@ -298,21 +298,21 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
       {/* Existing Samples */}
       <div className="grid gap-4 sm:gap-6 mb-6 sm:mb-8">
         {samples.map((sample, index) => (
-          <div key={sample.id} className="bg-white/10 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-white/20 p-4 sm:p-6 shadow-xl hover:shadow-2xl hover:bg-white/15 transition-all duration-300">
+          <div key={sample.id} className="bg-white/80 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 shadow-lg hover:shadow-xl hover:bg-white/90 transition-all duration-300">
             <div className="flex items-start justify-between mb-3 sm:mb-4">
               <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-cyan-400 to-purple-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg flex-shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg flex-shrink-0">
                   {index + 1}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-white text-base sm:text-lg truncate">{sample.title}</h3>
+                    <h3 className="font-semibold text-gray-800 text-base sm:text-lg truncate">{sample.title}</h3>
                     {sample.saved && (
-                      <div className="w-2 h-2 bg-emerald-400 rounded-full flex-shrink-0" title="Saved to your account" />
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0" title="Saved to your account" />
                     )}
                   </div>
                   {!sample.saved && user && (
-                    <p className="text-xs text-yellow-400">Not saved yet</p>
+                    <p className="text-xs text-amber-600">Not saved yet</p>
                   )}
                 </div>
               </div>
@@ -321,11 +321,11 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
                   <button
                     onClick={() => saveSampleToDatabase(sample)}
                     disabled={savingId === sample.id}
-                    className="text-emerald-400 hover:text-emerald-300 transition-colors p-1.5 sm:p-2 hover:bg-emerald-500/10 rounded-lg disabled:opacity-50"
+                    className="text-emerald-600 hover:text-emerald-700 transition-colors p-1.5 sm:p-2 hover:bg-emerald-50 rounded-lg disabled:opacity-50"
                     title="Save to your account"
                   >
                     {savingId === sample.id ? (
-                      <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <Save className="w-4 h-4 sm:w-5 sm:h-5" />
                     )}
@@ -334,25 +334,25 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
                 <button
                   onClick={() => removeSample(sample.id)}
                   disabled={deletingId === sample.id}
-                  className="text-gray-400 hover:text-red-400 transition-colors p-1.5 sm:p-2 hover:bg-red-500/10 rounded-lg disabled:opacity-50"
+                  className="text-gray-400 hover:text-red-500 transition-colors p-1.5 sm:p-2 hover:bg-red-50 rounded-lg disabled:opacity-50"
                   title="Delete sample"
                 >
                   {deletingId === sample.id ? (
-                    <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                   )}
                 </button>
               </div>
             </div>
-            <p className="text-gray-300 leading-relaxed line-clamp-3 mb-3 text-sm sm:text-base">{sample.content}</p>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
+            <p className="text-gray-600 leading-relaxed line-clamp-3 mb-3 text-sm sm:text-base">{sample.content}</p>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
               <Zap className="w-3 h-3" />
               {sample.content.split(' ').length} words
               {sample.saved && (
                 <>
                   <span className="mx-1">•</span>
-                  <span className="text-emerald-400">Saved</span>
+                  <span className="text-emerald-600">Saved</span>
                 </>
               )}
             </div>
@@ -361,12 +361,12 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
       </div>
 
       {/* Add New Sample */}
-      <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-xl sm:rounded-2xl p-6 sm:p-8 border border-white/20 shadow-xl">
+      <div className="bg-gradient-to-br from-white/90 to-gray-50/90 backdrop-blur-xl rounded-xl sm:rounded-2xl p-6 sm:p-8 border border-gray-200 shadow-lg">
         <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-lg sm:rounded-xl flex items-center justify-center">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg sm:rounded-xl flex items-center justify-center">
             <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-white">Add Writing Sample</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Add Writing Sample</h3>
         </div>
         
         <div className="space-y-4 sm:space-y-6">
@@ -376,7 +376,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
             value={newSample.title}
             onChange={(e) => setNewSample({ ...newSample, title: e.target.value })}
             disabled={samples.length >= limits.maxSamples}
-            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all backdrop-blur-sm text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all backdrop-blur-sm text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
           />
           
           <textarea
@@ -385,18 +385,18 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
             onChange={(e) => setNewSample({ ...newSample, content: e.target.value })}
             rows={5}
             disabled={samples.length >= limits.maxSamples}
-            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
           />
           
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-            <span className="text-sm text-gray-400 flex items-center gap-2">
+            <span className="text-sm text-gray-500 flex items-center gap-2">
               <Zap className="w-4 h-4" />
               {newSample.content.split(' ').filter(w => w.trim()).length} words
             </span>
             <button
               onClick={addSample}
               disabled={!newSample.content.trim() || !newSample.title.trim() || savingId !== null || samples.length >= limits.maxSamples}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25 text-sm sm:text-base"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
             >
               <Plus className="w-4 h-4" />
               {samples.length >= limits.maxSamples ? 'Limit Reached' : 'Add Sample'}
@@ -411,20 +411,20 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
         <button
           onClick={onNext}
           disabled={!canProceed}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-3 sm:gap-4 px-8 sm:px-10 py-4 sm:py-5 bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 text-white rounded-xl sm:rounded-2xl font-semibold text-base sm:text-lg hover:from-purple-600 hover:via-pink-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-2xl shadow-purple-500/25"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-3 sm:gap-4 px-8 sm:px-10 py-4 sm:py-5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white rounded-xl sm:rounded-2xl font-semibold text-base sm:text-lg hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-2xl shadow-purple-500/25"
         >
           Continue to Rewriter
           <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
         {!canProceed && (
-          <p className="text-sm text-gray-400 mt-3 sm:mt-4 px-4">Add at least 2 writing samples to continue</p>
+          <p className="text-sm text-gray-500 mt-3 sm:mt-4 px-4">Add at least 2 writing samples to continue</p>
         )}
       </div>
 
       {/* Sign in prompt for non-authenticated users */}
       {!user && samples.length > 0 && (
-        <div className="mt-6 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-center">
-          <p className="text-cyan-300 text-sm">
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
+          <p className="text-blue-700 text-sm">
             💡 Sign in to save your writing samples and access them anytime!
           </p>
         </div>

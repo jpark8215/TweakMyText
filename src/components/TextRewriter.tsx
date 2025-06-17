@@ -199,26 +199,26 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 mb-8 sm:mb-10">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 text-gray-300 hover:text-white transition-colors hover:bg-white/10 rounded-lg sm:rounded-xl text-sm sm:text-base"
+          className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors hover:bg-gray-100 rounded-lg sm:rounded-xl text-sm sm:text-base"
         >
           <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           Back to Samples
         </button>
         
         <div className="text-center flex-1">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent mb-1 sm:mb-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-1 sm:mb-2">
             Style Rewriter
           </h1>
-          <p className="text-gray-300 text-sm sm:text-base lg:text-lg">
+          <p className="text-gray-600 text-sm sm:text-base lg:text-lg">
             Transform any text to match your writing style
             {limits.hasExtendedAnalysis && (
-              <span className="block text-yellow-400 text-xs mt-1 flex items-center justify-center gap-1">
+              <span className="block text-amber-600 text-xs mt-1 flex items-center justify-center gap-1">
                 <Star className="w-3 h-3" />
                 Extended Analysis {limits.hasPriorityProcessing && '• Fastest Processing (3x)'}
               </span>
             )}
             {limits.hasAdvancedAnalysis && !limits.hasExtendedAnalysis && (
-              <span className="block text-cyan-400 text-xs mt-1">
+              <span className="block text-blue-600 text-xs mt-1">
                 ✨ Advanced Analysis {limits.hasPriorityProcessing && '• Priority Processing (2x)'}
               </span>
             )}
@@ -227,16 +227,16 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
         
         <div className="flex items-center gap-3">
           {user && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg border border-white/20">
-              <Zap className="w-4 h-4 text-yellow-400" />
-              <span className="text-white text-sm font-medium">{user.credits_remaining}</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-white/80 rounded-lg border border-gray-200">
+              <Zap className="w-4 h-4 text-amber-500" />
+              <span className="text-gray-800 text-sm font-medium">{user.credits_remaining}</span>
               {user.subscription_tier === 'free' && (
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-500">
                   ({user.daily_credits_used}/3 today)
                 </span>
               )}
               {user.subscription_tier !== 'free' && (
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-500">
                   ({user.monthly_credits_used}/{limits.monthlyLimit} month)
                 </span>
               )}
@@ -244,15 +244,15 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           )}
           <button
             onClick={() => setShowToneControls(!showToneControls)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg sm:rounded-xl transition-all backdrop-blur-sm border border-white/20 text-sm sm:text-base"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-white/80 hover:bg-white/90 text-gray-700 rounded-lg sm:rounded-xl transition-all backdrop-blur-sm border border-gray-200 text-sm sm:text-base"
           >
             <Sliders className="w-4 h-4" />
             Tone Controls
             {limits.canUsePresets && (
-              <Crown className="w-3 h-3 text-yellow-400" />
+              <Crown className="w-3 h-3 text-amber-500" />
             )}
             {limits.canUseAdvancedPresets && (
-              <Star className="w-3 h-3 text-yellow-400" />
+              <Star className="w-3 h-3 text-amber-500" />
             )}
           </button>
         </div>
@@ -260,12 +260,12 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
 
       {/* Security Error Alert */}
       {securityError && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
             <div>
-              <p className="text-red-300 font-medium">Access Restricted</p>
-              <p className="text-red-400/80 text-sm">{securityError}</p>
+              <p className="text-red-700 font-medium">Access Restricted</p>
+              <p className="text-red-600 text-sm">{securityError}</p>
             </div>
           </div>
         </div>
@@ -275,12 +275,12 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       {user && (
         <div className="mb-6 sm:mb-8 space-y-4">
           {user.credits_remaining === 0 && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
                 <div>
-                  <p className="text-red-300 font-medium">No credits remaining</p>
-                  <p className="text-red-400/80 text-sm">
+                  <p className="text-red-700 font-medium">No credits remaining</p>
+                  <p className="text-red-600 text-sm">
                     {user.subscription_tier === 'free' 
                       ? `Your daily credits will reset in ${getTimeUntilReset()} hours at midnight UTC.`
                       : 'Your monthly credits will reset on your signup anniversary.'
@@ -292,12 +292,12 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           )}
           
           {user.subscription_tier === 'free' && user.daily_credits_used >= 3 && user.credits_remaining > 0 && (
-            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+                <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
                 <div>
-                  <p className="text-yellow-300 font-medium">Daily limit reached</p>
-                  <p className="text-yellow-400/80 text-sm">
+                  <p className="text-amber-800 font-medium">Daily limit reached</p>
+                  <p className="text-amber-700 text-sm">
                     You've used your 3 daily credits. Reset in {getTimeUntilReset()} hours.
                   </p>
                 </div>
@@ -306,14 +306,14 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           )}
 
           {user.monthly_credits_used >= limits.monthlyLimit - 10 && user.monthly_credits_used < limits.monthlyLimit && (
-            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-orange-400 flex-shrink-0" />
+                <Calendar className="w-5 h-5 text-orange-600 flex-shrink-0" />
                 <div>
-                  <p className="text-orange-300 font-medium">
+                  <p className="text-orange-800 font-medium">
                     {limits.monthlyLimit - user.monthly_credits_used} credits left this month
                   </p>
-                  <p className="text-orange-400/80 text-sm">
+                  <p className="text-orange-700 text-sm">
                     Monthly limit resets on day {user.monthly_reset_date} of each month.
                   </p>
                 </div>
@@ -322,12 +322,12 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           )}
 
           {user.monthly_credits_used >= limits.monthlyLimit && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-red-400 flex-shrink-0" />
+                <Calendar className="w-5 h-5 text-red-500 flex-shrink-0" />
                 <div>
-                  <p className="text-red-300 font-medium">Monthly limit reached</p>
-                  <p className="text-red-400/80 text-sm">
+                  <p className="text-red-700 font-medium">Monthly limit reached</p>
+                  <p className="text-red-600 text-sm">
                     You've used all {limits.monthlyLimit} monthly credits. Limit resets on day {user.monthly_reset_date}.
                   </p>
                 </div>
@@ -337,14 +337,14 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
 
           {/* Export limit warning */}
           {user.subscription_tier !== 'premium' && (user.monthly_exports_used || 0) >= limits.exportLimit - 2 && (
-            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+            <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <Download className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                <Download className="w-5 h-5 text-purple-600 flex-shrink-0" />
                 <div>
-                  <p className="text-purple-300 font-medium">
+                  <p className="text-purple-800 font-medium">
                     {limits.exportLimit - (user.monthly_exports_used || 0)} exports left this month
                   </p>
-                  <p className="text-purple-400/80 text-sm">
+                  <p className="text-purple-700 text-sm">
                     {user.subscription_tier === 'free' 
                       ? 'Free users can export up to 5 results per month. Upgrade for more exports.'
                       : 'Pro users can export up to 200 results per month. Upgrade to Premium for unlimited exports.'
@@ -369,16 +369,16 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
       )}
 
       {/* Input Section */}
-      <div className="bg-white/10 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-white/20 p-6 sm:p-8 shadow-xl mb-6 sm:mb-8">
+      <div className="bg-white/80 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-lg mb-6 sm:mb-8">
         <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-lg sm:rounded-xl flex items-center justify-center">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg sm:rounded-xl flex items-center justify-center">
             <Send className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-white">Input Text</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Input Text</h3>
           {limits.hasPriorityProcessing && (
-            <div className="flex items-center gap-1 px-2 py-1 bg-cyan-500/20 rounded-full">
-              <Crown className="w-3 h-3 text-cyan-400" />
-              <span className="text-xs text-cyan-300">
+            <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 rounded-full">
+              <Crown className="w-3 h-3 text-blue-600" />
+              <span className="text-xs text-blue-700">
                 {user?.subscription_tier === 'premium' ? 'Fastest (3x)' : 'Priority (2x)'}
               </span>
             </div>
@@ -390,11 +390,11 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           onChange={(e) => setInputText(e.target.value)}
           placeholder="Paste the text you want to rewrite in your style..."
           rows={5}
-          className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base"
+          className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base"
         />
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-6 mt-4 sm:mt-6">
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-gray-500">
             {inputText.split(' ').filter(w => w.trim()).length} words
           </span>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
@@ -402,7 +402,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
               <button
                 onClick={handleRewrite}
                 disabled={isRewriting || !canRewrite}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg sm:rounded-xl transition-colors border border-white/20 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-gray-50 text-gray-600 rounded-lg sm:rounded-xl transition-colors border border-gray-200 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw className="w-4 h-4" />
                 Rewrite Again
@@ -411,7 +411,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             <button
               onClick={handleRewrite}
               disabled={!canRewrite || isRewriting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-cyan-500/25 text-sm sm:text-base"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
             >
               {isRewriting ? (
                 <>
