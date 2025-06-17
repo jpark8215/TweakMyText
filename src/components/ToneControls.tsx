@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, BarChart3, Crown, Sparkles, Star, Settings } from 'lucide-react';
+import { X, BarChart3, Crown, Sparkles, Star, Settings, Lock } from 'lucide-react';
 import { ToneSettings } from '../types';
 import { useAuth } from '../hooks/useAuth';
 
@@ -13,6 +13,11 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
   const { user } = useAuth();
 
   const handleSliderChange = (key: keyof ToneSettings, value: number) => {
+    // Check if user has permission to modify tone settings
+    if (!user || user.subscription_tier === 'free') {
+      return; // Free users cannot modify tone settings
+    }
+    
     onChange({
       ...settings,
       [key]: value
@@ -20,6 +25,10 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
   };
 
   const resetToDefaults = () => {
+    if (!user || user.subscription_tier === 'free') {
+      return; // Free users cannot reset tone settings
+    }
+    
     onChange({ 
       formality: 50, 
       casualness: 50, 
@@ -30,6 +39,7 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
 
   const hasTonePresets = user && (user.subscription_tier === 'pro' || user.subscription_tier === 'premium');
   const hasCustomTuning = user && user.subscription_tier === 'premium';
+  const canModifyTone = user && user.subscription_tier !== 'free';
 
   const presets = [
     { name: 'Professional', values: { formality: 80, casualness: 20, enthusiasm: 40, technicality: 70 } },
@@ -47,6 +57,16 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
   ];
 
   const applyPreset = (preset: typeof presets[0]) => {
+    if (!hasTonePresets) {
+      return; // Only Pro/Premium users can apply presets
+    }
+    onChange(preset.values);
+  };
+
+  const applyAdvancedPreset = (preset: typeof advancedPresets[0]) => {
+    if (!hasCustomTuning) {
+      return; // Only Premium users can apply advanced presets
+    }
     onChange(preset.values);
   };
 
@@ -101,9 +121,13 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
               {hasCustomTuning && (
                 <Star className="w-4 h-4 text-yellow-400" />
               )}
+              {!canModifyTone && (
+                <Lock className="w-4 h-4 text-gray-400" />
+              )}
             </div>
             <p className="text-xs sm:text-sm text-gray-400">
-              {hasCustomTuning ? 'Custom tone fine-tuning with advanced presets' : 
+              {!canModifyTone ? 'View-only - automatically set based on your writing samples' :
+               hasCustomTuning ? 'Custom tone fine-tuning with advanced presets' : 
                hasTonePresets ? 'Advanced tone controls with presets' : 
                'Automatically set based on your writing samples'}
             </p>
@@ -116,6 +140,27 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
           <X className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
       </div>
+
+      {/* Free Tier Upgrade Notice */}
+      {!canModifyTone && (
+        <div className="mb-6 sm:mb-8 p-4 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-400/30 rounded-xl">
+          <div className="flex items-center gap-3 mb-2">
+            <Lock className="w-5 h-5 text-cyan-400" />
+            <h4 className="text-white font-medium">Tone Controls Locked</h4>
+          </div>
+          <p className="text-gray-300 text-sm mb-3">
+            Tone settings are automatically detected from your writing samples. Upgrade to Pro or Premium to customize tone controls.
+          </p>
+          <div className="flex gap-2">
+            <div className="text-xs text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded px-2 py-1">
+              Pro: Manual tone adjustment + presets
+            </div>
+            <div className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded px-2 py-1">
+              Premium: Custom fine-tuning + advanced presets
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Basic Tone Presets for Pro users */}
       {hasTonePresets && (
@@ -134,7 +179,8 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
               <button
                 key={preset.name}
                 onClick={() => applyPreset(preset)}
-                className="px-3 py-2 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 text-xs sm:text-sm font-medium rounded-lg border border-cyan-400/30 hover:border-cyan-400/50 transition-all backdrop-blur-sm"
+                disabled={!hasTonePresets}
+                className="px-3 py-2 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-300 text-xs sm:text-sm font-medium rounded-lg border border-cyan-400/30 hover:border-cyan-400/50 transition-all backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {preset.name}
               </button>
@@ -143,7 +189,7 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
         </div>
       )}
 
-      {/* Advanced Presets for Premium users */}
+      {/* Advanced Presets for Premium users only */}
       {hasCustomTuning && (
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-2 mb-4">
@@ -158,7 +204,7 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
             {advancedPresets.map((preset) => (
               <button
                 key={preset.name}
-                onClick={() => applyPreset(preset)}
+                onClick={() => applyAdvancedPreset(preset)}
                 className="px-3 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 text-xs sm:text-sm font-medium rounded-lg border border-yellow-400/30 hover:border-yellow-400/50 transition-all backdrop-blur-sm"
               >
                 {preset.name}
@@ -179,6 +225,11 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
                     Fine-tuned
                   </span>
                 )}
+                {!canModifyTone && (
+                  <span className="ml-2 text-xs text-gray-400">
+                    Auto-detected
+                  </span>
+                )}
               </label>
               <p className="text-xs sm:text-sm text-gray-400 mt-1">{slider.description}</p>
             </div>
@@ -197,13 +248,14 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
                   max={100}
                   value={settings[slider.key]}
                   onChange={(e) => handleSliderChange(slider.key, parseInt(e.target.value))}
-                  className="w-full h-2.5 sm:h-3 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
+                  disabled={!canModifyTone}
+                  className="w-full h-2.5 sm:h-3 bg-white/20 rounded-lg appearance-none cursor-pointer slider disabled:cursor-not-allowed disabled:opacity-50"
                   style={{
                     background: `linear-gradient(to right, transparent 0%, transparent ${settings[slider.key]}%, rgba(255,255,255,0.2) ${settings[slider.key]}%, rgba(255,255,255,0.2) 100%)`
                   }}
                 />
                 <div 
-                  className={`absolute top-0 left-0 h-2.5 sm:h-3 bg-gradient-to-r ${slider.color} rounded-lg pointer-events-none transition-all duration-300`}
+                  className={`absolute top-0 left-0 h-2.5 sm:h-3 bg-gradient-to-r ${slider.color} rounded-lg pointer-events-none transition-all duration-300 ${!canModifyTone ? 'opacity-50' : ''}`}
                   style={{ width: `${settings[slider.key]}%` }}
                 />
               </div>
@@ -215,7 +267,8 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
       <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <button
           onClick={resetToDefaults}
-          className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
+          disabled={!canModifyTone}
+          className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Reset to defaults (50%)
         </button>
