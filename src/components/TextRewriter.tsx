@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown, Star } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
-import { rewriteText, analyzeToneFromSamples } from '../utils/styleAnalyzer';
+import { secureRewriteText, analyzeToneFromSamples } from '../utils/secureStyleAnalyzer';
+import { validateToneAccess, validatePresetAccess, getSubscriptionLimits } from '../utils/subscriptionValidator';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import ToneControls from './ToneControls';
@@ -23,70 +24,29 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     enthusiasm: 50,
     technicality: 50
   });
+  const [securityError, setSecurityError] = useState<string | null>(null);
 
   const { user, updateCredits, updateExports } = useAuth();
 
   // Analyze samples and set initial tone settings when component mounts or samples change
   useEffect(() => {
     if (samples.length > 0) {
-      const analyzedTone = analyzeToneFromSamples(samples);
-      setToneSettings(analyzedTone);
+      try {
+        const analyzedTone = analyzeToneFromSamples(samples, user);
+        setToneSettings(analyzedTone);
+      } catch (error) {
+        console.warn('Tone analysis limited by subscription tier:', error);
+        // Keep default settings for free users
+      }
     }
-  }, [samples]);
+  }, [samples, user]);
 
-  const getSubscriptionLimits = () => {
-    if (!user) return { 
-      dailyLimit: 0, 
-      monthlyLimit: 0, 
-      exportLimit: 0, 
-      hasAdvancedAnalysis: false, 
-      hasPriorityProcessing: false, 
-      hasTonePresets: false,
-      hasExtendedAnalysis: false,
-      hasCustomTuning: false
-    };
-    
-    switch (user.subscription_tier) {
-      case 'pro':
-        return { 
-          dailyLimit: -1, // No daily limit
-          monthlyLimit: 200, 
-          exportLimit: 200,
-          hasAdvancedAnalysis: true,
-          hasPriorityProcessing: true,
-          hasTonePresets: true,
-          hasExtendedAnalysis: false,
-          hasCustomTuning: false
-        };
-      case 'premium':
-        return { 
-          dailyLimit: -1, // No daily limit
-          monthlyLimit: 300, 
-          exportLimit: -1, // Unlimited
-          hasAdvancedAnalysis: true,
-          hasPriorityProcessing: true,
-          hasTonePresets: true,
-          hasExtendedAnalysis: true, // Extended style analysis
-          hasCustomTuning: true // Custom tone fine-tuning
-        };
-      default: // free
-        return { 
-          dailyLimit: 3, 
-          monthlyLimit: 90, 
-          exportLimit: 5,
-          hasAdvancedAnalysis: false,
-          hasPriorityProcessing: false,
-          hasTonePresets: false,
-          hasExtendedAnalysis: false,
-          hasCustomTuning: false
-        };
-    }
-  };
-
-  const limits = getSubscriptionLimits();
+  const limits = getSubscriptionLimits(user);
 
   const handleRewrite = async () => {
     if (!inputText.trim() || !user) return;
+    
+    setSecurityError(null);
     
     // Check if user has credits
     if (user.credits_remaining <= 0) {
@@ -109,14 +69,8 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
     
     setIsRewriting(true);
     try {
-      // Simulate priority processing for Pro/Premium users
-      const processingDelay = user.subscription_tier === 'premium' ? 800 : // 3x faster
-                             user.subscription_tier === 'pro' ? 1200 : 2000; // 2x faster vs standard
-      
-      const rewriteResult = await rewriteText(inputText, samples, toneSettings);
-      
-      // Add processing delay simulation
-      await new Promise(resolve => setTimeout(resolve, processingDelay));
+      // Perform secure rewrite with subscription validation
+      const rewriteResult = await secureRewriteText(inputText, samples, toneSettings, user);
       
       setResult(rewriteResult);
 
@@ -129,7 +83,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
         return;
       }
 
-      // Save rewrite history
+      // Save rewrite history with security audit trail
       await supabase.from('rewrite_history').insert({
         user_id: user.id,
         original_text: rewriteResult.original,
@@ -139,11 +93,29 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
         credits_used: creditsUsed,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Rewrite failed:', error);
-      alert('Rewrite failed. Please try again.');
+      if (error.message.includes('subscription') || error.message.includes('requires')) {
+        setSecurityError(error.message);
+      } else {
+        alert('Rewrite failed. Please try again.');
+      }
     } finally {
       setIsRewriting(false);
+    }
+  };
+
+  const handleToneSettingsChange = (newSettings: ToneSettings) => {
+    try {
+      // Validate tone modification access
+      if (user?.subscription_tier === 'free') {
+        validateToneAccess(user, 'modify_tone');
+      }
+      setToneSettings(newSettings);
+      setSecurityError(null);
+    } catch (error: any) {
+      setSecurityError(error.message);
+      console.warn('Tone modification blocked:', error.message);
     }
   };
 
@@ -154,47 +126,53 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
   const handleExport = async () => {
     if (!result || !user) return;
     
-    // Check export limits
-    if (user.subscription_tier === 'free') {
-      const monthlyExportsUsed = user.monthly_exports_used || 0;
-      if (monthlyExportsUsed >= 5) {
-        alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for more exports.');
-        return;
+    try {
+      // Check export limits
+      if (user.subscription_tier === 'free') {
+        const monthlyExportsUsed = user.monthly_exports_used || 0;
+        if (monthlyExportsUsed >= 5) {
+          alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for more exports.');
+          return;
+        }
+      } else if (user.subscription_tier === 'pro') {
+        const monthlyExportsUsed = user.monthly_exports_used || 0;
+        if (monthlyExportsUsed >= 200) {
+          alert('You have reached your monthly export limit of 200. Upgrade to Premium for unlimited exports.');
+          return;
+        }
       }
-    } else if (user.subscription_tier === 'pro') {
-      const monthlyExportsUsed = user.monthly_exports_used || 0;
-      if (monthlyExportsUsed >= 200) {
-        alert('You have reached your monthly export limit of 200. Upgrade to Premium for unlimited exports.');
-        return;
-      }
-    }
-    
-    const exportData = {
-      original: result.original,
-      rewritten: result.rewritten,
-      confidence: result.confidence,
-      styleTags: result.styleTags,
-      timestamp: result.timestamp,
-      samples: samples.map(s => ({ title: s.title, preview: s.content.substring(0, 100) + '...' })),
-      tier: user.subscription_tier,
-      analysisType: limits.hasExtendedAnalysis ? 'Extended' : limits.hasAdvancedAnalysis ? 'Advanced' : 'Basic',
-      processingPriority: limits.hasPriorityProcessing ? (user.subscription_tier === 'premium' ? '3x Speed' : '2x Speed') : 'Standard'
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rewrite-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+      
+      const exportData = {
+        original: result.original,
+        rewritten: result.rewritten,
+        confidence: result.confidence,
+        styleTags: result.styleTags,
+        timestamp: result.timestamp,
+        samples: samples.map(s => ({ title: s.title, preview: s.content.substring(0, 100) + '...' })),
+        tier: user.subscription_tier,
+        analysisType: limits.hasExtendedAnalysis ? 'Extended' : limits.hasAdvancedAnalysis ? 'Advanced' : 'Basic',
+        processingPriority: limits.hasPriorityProcessing ? (user.subscription_tier === 'premium' ? '3x Speed' : '2x Speed') : 'Standard',
+        securityValidated: true, // Mark as security validated export
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rewrite-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
 
-    // Update export count
-    if (user.subscription_tier !== 'premium') {
-      const { error } = await updateExports(1);
-      if (error) {
-        console.error('Failed to update export count:', error);
+      // Update export count
+      if (user.subscription_tier !== 'premium') {
+        const { error } = await updateExports(1);
+        if (error) {
+          console.error('Failed to update export count:', error);
+        }
       }
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Please try again.');
     }
   };
 
@@ -270,15 +248,28 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
           >
             <Sliders className="w-4 h-4" />
             Tone Controls
-            {limits.hasTonePresets && (
+            {limits.canUsePresets && (
               <Crown className="w-3 h-3 text-yellow-400" />
             )}
-            {limits.hasCustomTuning && (
+            {limits.canUseAdvancedPresets && (
               <Star className="w-3 h-3 text-yellow-400" />
             )}
           </button>
         </div>
       </div>
+
+      {/* Security Error Alert */}
+      {securityError && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+            <div>
+              <p className="text-red-300 font-medium">Access Restricted</p>
+              <p className="text-red-400/80 text-sm">{securityError}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Credits Warning */}
       {user && (
@@ -371,7 +362,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
         <div className="mb-6 sm:mb-8">
           <ToneControls
             settings={toneSettings}
-            onChange={setToneSettings}
+            onChange={handleToneSettingsChange}
             onClose={() => setShowToneControls(false)}
           />
         </div>

@@ -1,0 +1,164 @@
+import { User } from '../types';
+
+export interface SubscriptionLimits {
+  canModifyTone: boolean;
+  canUsePresets: boolean;
+  canUseAdvancedPresets: boolean;
+  hasAdvancedAnalysis: boolean;
+  hasExtendedAnalysis: boolean;
+  hasPriorityProcessing: boolean;
+  processingPriority: 'standard' | 'priority' | 'premium';
+  maxWritingSamples: number;
+  dailyLimit: number;
+  monthlyLimit: number;
+  exportLimit: number;
+}
+
+export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => {
+  if (!user) {
+    return {
+      canModifyTone: false,
+      canUsePresets: false,
+      canUseAdvancedPresets: false,
+      hasAdvancedAnalysis: false,
+      hasExtendedAnalysis: false,
+      hasPriorityProcessing: false,
+      processingPriority: 'standard',
+      maxWritingSamples: 0,
+      dailyLimit: 0,
+      monthlyLimit: 0,
+      exportLimit: 0,
+    };
+  }
+
+  switch (user.subscription_tier) {
+    case 'premium':
+      return {
+        canModifyTone: true,
+        canUsePresets: true,
+        canUseAdvancedPresets: true,
+        hasAdvancedAnalysis: true,
+        hasExtendedAnalysis: true,
+        hasPriorityProcessing: true,
+        processingPriority: 'premium',
+        maxWritingSamples: 100,
+        dailyLimit: -1, // Unlimited
+        monthlyLimit: 300,
+        exportLimit: -1, // Unlimited
+      };
+    case 'pro':
+      return {
+        canModifyTone: true,
+        canUsePresets: true,
+        canUseAdvancedPresets: false,
+        hasAdvancedAnalysis: true,
+        hasExtendedAnalysis: false,
+        hasPriorityProcessing: true,
+        processingPriority: 'priority',
+        maxWritingSamples: 25,
+        dailyLimit: -1, // Unlimited
+        monthlyLimit: 200,
+        exportLimit: 200,
+      };
+    default: // free
+      return {
+        canModifyTone: false,
+        canUsePresets: false,
+        canUseAdvancedPresets: false,
+        hasAdvancedAnalysis: false,
+        hasExtendedAnalysis: false,
+        hasPriorityProcessing: false,
+        processingPriority: 'standard',
+        maxWritingSamples: 3,
+        dailyLimit: 3,
+        monthlyLimit: 90,
+        exportLimit: 5,
+      };
+  }
+};
+
+export const validateToneAccess = (user: User | null, action: string): void => {
+  const limits = getSubscriptionLimits(user);
+
+  switch (action) {
+    case 'modify_tone':
+      if (!limits.canModifyTone) {
+        throw new Error('Tone customization requires Pro or Premium subscription');
+      }
+      break;
+    case 'use_presets':
+      if (!limits.canUsePresets) {
+        throw new Error('Tone presets require Pro or Premium subscription');
+      }
+      break;
+    case 'use_advanced_presets':
+      if (!limits.canUseAdvancedPresets) {
+        throw new Error('Advanced tone presets require Premium subscription');
+      }
+      break;
+    case 'advanced_analysis':
+      if (!limits.hasAdvancedAnalysis) {
+        throw new Error('Advanced style analysis requires Pro or Premium subscription');
+      }
+      break;
+    case 'extended_analysis':
+      if (!limits.hasExtendedAnalysis) {
+        throw new Error('Extended style analysis requires Premium subscription');
+      }
+      break;
+    case 'priority_processing':
+      if (!limits.hasPriorityProcessing) {
+        throw new Error('Priority processing requires Pro or Premium subscription');
+      }
+      break;
+    default:
+      throw new Error('Unknown action for subscription validation');
+  }
+};
+
+export const validateToneSettings = (user: User | null, toneSettings: any): void => {
+  const limits = getSubscriptionLimits(user);
+
+  // Check if user is trying to use custom tone settings
+  const defaultSettings = { formality: 50, casualness: 50, enthusiasm: 50, technicality: 50 };
+  const hasCustomSettings = Object.keys(toneSettings).some(
+    key => Math.abs(toneSettings[key] - defaultSettings[key]) > 5 // Allow 5% tolerance for auto-detection
+  );
+
+  if (hasCustomSettings && !limits.canModifyTone) {
+    throw new Error('Custom tone settings require Pro or Premium subscription');
+  }
+};
+
+export const validatePresetAccess = (user: User | null, presetName: string): void => {
+  const limits = getSubscriptionLimits(user);
+  
+  const basicPresets = ['Professional', 'Friendly', 'Academic', 'Casual'];
+  const advancedPresets = ['Executive', 'Creative', 'Technical', 'Persuasive'];
+
+  if (basicPresets.includes(presetName) && !limits.canUsePresets) {
+    throw new Error('Tone presets require Pro or Premium subscription');
+  }
+
+  if (advancedPresets.includes(presetName) && !limits.canUseAdvancedPresets) {
+    throw new Error('Advanced tone presets require Premium subscription');
+  }
+};
+
+export const getAnalysisLevel = (user: User | null): 'basic' | 'advanced' | 'extended' => {
+  const limits = getSubscriptionLimits(user);
+  
+  if (limits.hasExtendedAnalysis) return 'extended';
+  if (limits.hasAdvancedAnalysis) return 'advanced';
+  return 'basic';
+};
+
+export const getProcessingPriority = (user: User | null): number => {
+  const limits = getSubscriptionLimits(user);
+  
+  switch (limits.processingPriority) {
+    case 'premium': return 1; // Highest priority
+    case 'priority': return 2; // Medium priority
+    default: return 3; // Standard priority
+  }
+};

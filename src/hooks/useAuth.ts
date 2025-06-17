@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
+import { logSecurityEvent } from '../utils/securityLogger';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -22,7 +23,27 @@ export const useAuth = () => {
       async (event, session) => {
         if (session?.user) {
           await fetchUserProfile(session.user);
+          
+          // Log authentication events
+          if (event === 'SIGNED_IN') {
+            await logSecurityEvent({
+              userId: session.user.id,
+              action: 'user_sign_in',
+              resource: 'authentication',
+              allowed: true,
+              subscriptionTier: 'unknown', // Will be updated after profile fetch
+            });
+          }
         } else {
+          if (event === 'SIGNED_OUT' && user) {
+            await logSecurityEvent({
+              userId: user.id,
+              action: 'user_sign_out',
+              resource: 'authentication',
+              allowed: true,
+              subscriptionTier: user.subscription_tier,
+            });
+          }
           setUser(null);
           setLoading(false);
         }
@@ -30,7 +51,7 @@ export const useAuth = () => {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user]);
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
@@ -65,26 +86,50 @@ export const useAuth = () => {
           .single();
 
         if (createError) throw createError;
-        setUser({
+        
+        const userProfile = {
           ...createdUser,
           created_at: new Date(createdUser.created_at),
           subscription_expires_at: createdUser.subscription_expires_at 
             ? new Date(createdUser.subscription_expires_at) 
             : undefined,
+        };
+        
+        setUser(userProfile);
+
+        // Log new user creation
+        await logSecurityEvent({
+          userId: userProfile.id,
+          action: 'user_profile_created',
+          resource: 'user_management',
+          allowed: true,
+          subscriptionTier: userProfile.subscription_tier,
         });
       } else if (error) {
         throw error;
       } else {
-        setUser({
+        const userProfile = {
           ...data,
           created_at: new Date(data.created_at),
           subscription_expires_at: data.subscription_expires_at 
             ? new Date(data.subscription_expires_at) 
             : undefined,
-        });
+        };
+        
+        setUser(userProfile);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      
+      // Log profile fetch error
+      await logSecurityEvent({
+        userId: authUser.id,
+        action: 'user_profile_fetch_error',
+        resource: 'user_management',
+        allowed: false,
+        subscriptionTier: 'unknown',
+        errorMessage: `Profile fetch failed: ${error}`,
+      });
     } finally {
       setLoading(false);
     }
@@ -95,6 +140,19 @@ export const useAuth = () => {
       email,
       password,
     });
+    
+    if (error) {
+      // Log failed sign-in attempt
+      await logSecurityEvent({
+        userId: 'unknown',
+        action: 'sign_in_failed',
+        resource: 'authentication',
+        allowed: false,
+        subscriptionTier: 'unknown',
+        errorMessage: error.message,
+      });
+    }
+    
     return { error };
   };
 
@@ -103,6 +161,19 @@ export const useAuth = () => {
       email,
       password,
     });
+    
+    if (error) {
+      // Log failed sign-up attempt
+      await logSecurityEvent({
+        userId: 'unknown',
+        action: 'sign_up_failed',
+        resource: 'authentication',
+        allowed: false,
+        subscriptionTier: 'unknown',
+        errorMessage: error.message,
+      });
+    }
+    
     return { error };
   };
 
@@ -116,6 +187,15 @@ export const useAuth = () => {
 
   const updateCredits = async (creditsUsed: number) => {
     if (!user) return { error: new Error('No user found') };
+
+    // Log credit usage attempt
+    await logSecurityEvent({
+      userId: user.id,
+      action: 'credit_usage_attempt',
+      resource: 'credits',
+      allowed: true,
+      subscriptionTier: user.subscription_tier,
+    });
 
     // Get subscription limits
     const getSubscriptionLimits = () => {
@@ -179,16 +259,40 @@ export const useAuth = () => {
 
       // Check if user has exceeded monthly limit
       if (user.monthly_credits_used >= limits.monthlyLimit) {
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'credit_limit_exceeded',
+          resource: 'credits',
+          allowed: false,
+          subscriptionTier: user.subscription_tier,
+          errorMessage: `Monthly credit limit reached (${limits.monthlyLimit} credits)`,
+        });
         return { error: new Error(`Monthly credit limit reached (${limits.monthlyLimit} credits)`) };
       }
 
       // Check if user has exceeded daily limit
       if (user.daily_credits_used >= limits.dailyLimit) {
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'daily_credit_limit_exceeded',
+          resource: 'credits',
+          allowed: false,
+          subscriptionTier: user.subscription_tier,
+          errorMessage: `Daily credit limit reached (${limits.dailyLimit} credits)`,
+        });
         return { error: new Error(`Daily credit limit reached (${limits.dailyLimit} credits)`) };
       }
     } else {
       // For Pro/Premium users, only check monthly limits
       if (user.monthly_credits_used >= limits.monthlyLimit) {
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'monthly_credit_limit_exceeded',
+          resource: 'credits',
+          allowed: false,
+          subscriptionTier: user.subscription_tier,
+          errorMessage: `Monthly credit limit reached (${limits.monthlyLimit} credits)`,
+        });
         return { error: new Error(`Monthly credit limit reached (${limits.monthlyLimit} credits)`) };
       }
     }
@@ -213,6 +317,25 @@ export const useAuth = () => {
         daily_credits_used: newDailyUsed,
         monthly_credits_used: newMonthlyUsed
       });
+
+      // Log successful credit usage
+      await logSecurityEvent({
+        userId: user.id,
+        action: 'credits_used',
+        resource: 'credits',
+        allowed: true,
+        subscriptionTier: user.subscription_tier,
+      });
+    } else {
+      // Log credit update error
+      await logSecurityEvent({
+        userId: user.id,
+        action: 'credit_update_error',
+        resource: 'credits',
+        allowed: false,
+        subscriptionTier: user.subscription_tier,
+        errorMessage: error.message,
+      });
     }
 
     return { error };
@@ -220,6 +343,15 @@ export const useAuth = () => {
 
   const updateExports = async (exportsUsed: number) => {
     if (!user) return { error: new Error('No user found') };
+
+    // Log export attempt
+    await logSecurityEvent({
+      userId: user.id,
+      action: 'export_attempt',
+      resource: 'exports',
+      allowed: true,
+      subscriptionTier: user.subscription_tier,
+    });
 
     // Get export limits based on subscription tier
     const getExportLimits = () => {
@@ -237,12 +369,27 @@ export const useAuth = () => {
 
     // Check if unlimited exports (Premium)
     if (limits.monthlyLimit === -1) {
+      await logSecurityEvent({
+        userId: user.id,
+        action: 'export_unlimited',
+        resource: 'exports',
+        allowed: true,
+        subscriptionTier: user.subscription_tier,
+      });
       return { error: null };
     }
 
     const newExportsUsed = (user.monthly_exports_used || 0) + exportsUsed;
     
     if (newExportsUsed > limits.monthlyLimit) {
+      await logSecurityEvent({
+        userId: user.id,
+        action: 'export_limit_exceeded',
+        resource: 'exports',
+        allowed: false,
+        subscriptionTier: user.subscription_tier,
+        errorMessage: `Monthly export limit reached (${limits.monthlyLimit} exports)`,
+      });
       return { error: new Error(`Monthly export limit reached (${limits.monthlyLimit} exports)`) };
     }
 
@@ -253,6 +400,25 @@ export const useAuth = () => {
 
     if (!error) {
       setUser({ ...user, monthly_exports_used: newExportsUsed });
+      
+      // Log successful export
+      await logSecurityEvent({
+        userId: user.id,
+        action: 'export_successful',
+        resource: 'exports',
+        allowed: true,
+        subscriptionTier: user.subscription_tier,
+      });
+    } else {
+      // Log export error
+      await logSecurityEvent({
+        userId: user.id,
+        action: 'export_error',
+        resource: 'exports',
+        allowed: false,
+        subscriptionTier: user.subscription_tier,
+        errorMessage: error.message,
+      });
     }
 
     return { error };
