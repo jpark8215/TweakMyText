@@ -229,9 +229,10 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-3 sm:mb-4 px-4">
           Capture Your Writing Style
         </h1>
-        <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed px-4">
-          Add 2-3 samples of your writing so we can learn your unique voice and tone
-        </p>
+        <div className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed px-4">
+          <div className="mb-2">Add 2-3 samples of your writing</div>
+          <div>so we can learn your unique voice and tone</div>
+        </div>
         {user && (
           <div className="mt-4 space-y-2">
             <p className="text-sm text-blue-600">
