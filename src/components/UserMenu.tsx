@@ -10,16 +10,29 @@ interface UserMenuProps {
 
 export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenPricing }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const { user, signOut } = useAuth();
 
   if (!user) return null;
 
   const handleSignOut = async () => {
+    if (isSigningOut) return; // Prevent multiple clicks
+    
+    setIsSigningOut(true);
     try {
-      await signOut();
-      setIsOpen(false);
+      const { error } = await signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+        alert('Failed to sign out. Please try again.');
+      } else {
+        setIsOpen(false);
+        // User state will be cleared by the auth hook
+      }
     } catch (error) {
       console.error('Sign out error:', error);
+      alert('Failed to sign out. Please try again.');
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -134,10 +147,11 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
               
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-3 py-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left"
+                disabled={isSigningOut}
+                className="w-full flex items-center gap-3 px-3 py-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <LogOut className="w-4 h-4" />
-                Sign Out
+                {isSigningOut ? 'Signing out...' : 'Sign Out'}
               </button>
             </div>
           </div>

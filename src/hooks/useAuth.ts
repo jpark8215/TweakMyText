@@ -51,7 +51,7 @@ export const useAuth = () => {
     );
 
     return () => subscription.unsubscribe();
-  }, [user]);
+  }, []); // Remove user dependency to prevent infinite loops
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
@@ -178,11 +178,33 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (!error) {
+    try {
+      // Log sign out attempt before clearing user state
+      if (user) {
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'user_sign_out_attempt',
+          resource: 'authentication',
+          allowed: true,
+          subscriptionTier: user.subscription_tier,
+        });
+      }
+
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Sign out error:', error);
+        return { error };
+      }
+
+      // Clear user state immediately after successful sign out
       setUser(null);
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Sign out error:', error);
+      return { error: error as Error };
     }
-    return { error };
   };
 
   const updateCredits = async (creditsUsed: number) => {

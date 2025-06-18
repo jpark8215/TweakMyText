@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check } from 'lucide-react';
+import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 interface SubscriptionManagementProps {
@@ -11,7 +11,22 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
   const [isProcessing, setIsProcessing] = useState(false);
   const { user } = useAuth();
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <p className="text-gray-600">Please sign in to manage your subscription.</p>
+          <button
+            onClick={onBack}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleCancelSubscription = async () => {
     setIsProcessing(true);
@@ -39,26 +54,70 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
           name: 'Pro',
           price: '$4.99/month',
           credits: '200 credits/month',
-          color: 'from-blue-500 to-indigo-500'
+          color: 'from-blue-500 to-indigo-500',
+          features: [
+            '200 rewrites per month',
+            'Advanced style analysis',
+            'Priority processing (2x faster)',
+            'Save up to 25 writing samples',
+            'Export up to 200 results',
+            'Basic tone presets',
+            'Rewrite history access',
+            'Email support'
+          ]
         };
       case 'premium':
         return {
           name: 'Premium',
           price: '$7.99/month',
           credits: '300 credits/month',
-          color: 'from-amber-500 to-orange-500'
+          color: 'from-amber-500 to-orange-500',
+          features: [
+            '300 rewrites per month',
+            'Extended style analysis',
+            'Fastest processing (3x speed)',
+            'Save up to 100 writing samples',
+            'Unlimited exports',
+            'Custom tone fine-tuning',
+            'Advanced presets',
+            'Full rewrite history',
+            'Bulk operations',
+            'Priority support'
+          ]
         };
       default:
         return {
           name: 'Free',
           price: 'Free',
           credits: '90 credits/month max',
-          color: 'from-gray-400 to-gray-500'
+          color: 'from-gray-400 to-gray-500',
+          features: [
+            '3 rewrites per day (90 max/month)',
+            'Basic style analysis',
+            'Standard processing',
+            'Save up to 3 writing samples',
+            'Export up to 5 results/month',
+            'View-only tone controls',
+            'Community support'
+          ]
         };
     }
   };
 
   const tierInfo = getTierInfo(user.subscription_tier);
+
+  // Calculate usage percentages
+  const creditUsagePercent = user.subscription_tier === 'free' 
+    ? Math.round((user.monthly_credits_used / 90) * 100)
+    : user.subscription_tier === 'pro'
+    ? Math.round((user.monthly_credits_used / 200) * 100)
+    : Math.round((user.monthly_credits_used / 300) * 100);
+
+  const exportUsagePercent = user.subscription_tier === 'free'
+    ? Math.round(((user.monthly_exports_used || 0) / 5) * 100)
+    : user.subscription_tier === 'pro'
+    ? Math.round(((user.monthly_exports_used || 0) / 200) * 100)
+    : 0; // Premium has unlimited exports
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -85,14 +144,52 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        {/* Usage Statistics */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <div className="bg-gray-50 rounded-xl p-4">
             <div className="flex items-center gap-3 mb-2">
-              <CreditCard className="w-5 h-5 text-blue-600" />
+              <Zap className="w-5 h-5 text-amber-600" />
               <span className="text-gray-800 font-medium">Credits</span>
             </div>
-            <p className="text-gray-600 text-sm">{tierInfo.credits}</p>
-            <p className="text-blue-600 text-lg font-bold">{user.credits_remaining} remaining</p>
+            <p className="text-gray-600 text-sm mb-2">{tierInfo.credits}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-blue-600 text-lg font-bold">{user.credits_remaining} remaining</p>
+              <span className="text-xs text-gray-500">{creditUsagePercent}% used</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${creditUsagePercent}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Download className="w-5 h-5 text-emerald-600" />
+              <span className="text-gray-800 font-medium">Exports</span>
+            </div>
+            <p className="text-gray-600 text-sm mb-2">
+              {user.subscription_tier === 'premium' ? 'Unlimited' : 
+               user.subscription_tier === 'pro' ? '200/month' : '5/month'}
+            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-emerald-600 text-lg font-bold">
+                {user.subscription_tier === 'premium' ? 'Unlimited' : 
+                 `${(user.monthly_exports_used || 0)} used`}
+              </p>
+              {user.subscription_tier !== 'premium' && (
+                <span className="text-xs text-gray-500">{exportUsagePercent}% used</span>
+              )}
+            </div>
+            {user.subscription_tier !== 'premium' && (
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div 
+                  className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${exportUsagePercent}%` }}
+                />
+              </div>
+            )}
           </div>
 
           {user.subscription_expires_at && (
@@ -113,9 +210,26 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
               <span className="text-gray-800 font-medium">Status</span>
             </div>
             <p className="text-emerald-600 font-medium">Active</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Resets on day {user.monthly_reset_date}
+            </p>
           </div>
         </div>
 
+        {/* Plan Features */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Plan Features</h3>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {tierInfo.features.map((feature, index) => (
+              <div key={index} className="flex items-center gap-3">
+                <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                <span className="text-gray-700 text-sm">{feature}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">
           {user.subscription_tier === 'free' ? (
             <button
@@ -130,7 +244,7 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
                 onClick={handleUpgrade}
                 className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25"
               >
-                Change Plan
+                {user.subscription_tier === 'pro' ? 'Upgrade to Premium' : 'Change Plan'}
               </button>
               <button
                 onClick={() => setShowCancelConfirm(true)}
@@ -162,6 +276,16 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
             <div>
               <p className="text-gray-800 font-medium">{tierInfo.name} Plan</p>
               <p className="text-gray-500 text-sm">November 1, 2024</p>
+            </div>
+            <div className="text-right">
+              <p className="text-gray-800 font-medium">{tierInfo.price}</p>
+              <p className="text-emerald-600 text-sm">Paid</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between py-3">
+            <div>
+              <p className="text-gray-800 font-medium">{tierInfo.name} Plan</p>
+              <p className="text-gray-500 text-sm">October 1, 2024</p>
             </div>
             <div className="text-right">
               <p className="text-gray-800 font-medium">{tierInfo.price}</p>
