@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PenTool, Sparkles, LogIn } from 'lucide-react';
 import StyleCapture from './components/StyleCapture';
 import TextRewriter from './components/TextRewriter';
@@ -21,6 +21,17 @@ function App() {
 
   const { user, loading } = useAuth();
 
+  // Reset view and clear data when user signs out
+  useEffect(() => {
+    if (!user && !loading) {
+      // User has signed out, reset to capture view and clear samples
+      setCurrentView('capture');
+      setWritingSamples([]);
+      setShowSettingsModal(false);
+      setShowPricingModal(false);
+    }
+  }, [user, loading]);
+
   const handleSamplesChange = (samples: WritingSample[]) => {
     setWritingSamples(samples);
   };
@@ -38,6 +49,10 @@ function App() {
   };
 
   const handleManageSubscription = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     setCurrentView('subscription');
     setShowSettingsModal(false);
   };
@@ -55,6 +70,103 @@ function App() {
           </div>
           <p className="text-gray-600">Loading...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Show signed out state for rewrite and subscription views when not authenticated
+  if (!user && (currentView === 'rewrite' || currentView === 'subscription')) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+        {/* Header */}
+        <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
+                  <PenTool className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    TweakMyText
+                  </h1>
+                  <p className="text-xs sm:text-sm text-gray-600">AI-Powered Writing Style Rewriter</p>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-indigo-600 transition-all text-sm shadow-md hover:shadow-lg"
+              >
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Signed Out Content */}
+        <main className="py-8 lg:py-16">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200 p-8 sm:p-12 shadow-lg">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+                <LogIn className="w-10 h-10 text-white" />
+              </div>
+              
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-4">
+                Sign In Required
+              </h1>
+              
+              <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
+                You've been signed out. Please sign in to access your writing samples, 
+                rewrite text, and manage your subscription.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-semibold text-lg hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-2xl shadow-blue-500/25"
+                >
+                  <LogIn className="w-5 h-5" />
+                  Sign In to Continue
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setCurrentView('capture');
+                    setWritingSamples([]);
+                  }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-6 py-3 bg-white text-gray-700 rounded-xl font-medium border border-gray-200 hover:bg-gray-50 transition-all"
+                >
+                  <PenTool className="w-5 h-5" />
+                  Back to Home
+                </button>
+              </div>
+
+              <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <p className="text-blue-700 text-sm">
+                  💡 New users get 3 free daily rewrites! Sign up to get started.
+                </p>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="bg-white/60 backdrop-blur-xl border-t border-gray-200/50 mt-8 sm:mt-12 lg:mt-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <div className="flex items-center justify-center gap-3 text-gray-600">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+              <span className="text-xs sm:text-sm text-center">Transform any text to match your unique writing style</span>
+            </div>
+          </div>
+        </footer>
+
+        {/* Auth Modal */}
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+        />
       </div>
     );
   }

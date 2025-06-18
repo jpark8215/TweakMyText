@@ -44,6 +44,7 @@ export const useAuth = () => {
               subscriptionTier: user.subscription_tier,
             });
           }
+          // Clear user state immediately on sign out
           setUser(null);
           setLoading(false);
         }
@@ -197,9 +198,7 @@ export const useAuth = () => {
         return { error };
       }
 
-      // Clear user state immediately after successful sign out
-      setUser(null);
-      
+      // User state will be cleared by the auth state change listener
       return { error: null };
     } catch (error) {
       console.error('Sign out error:', error);
