@@ -1,15 +1,73 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download, Receipt } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 
 interface SubscriptionManagementProps {
   onBack: () => void;
+  onOpenPricing?: () => void;
 }
 
-export default function SubscriptionManagement({ onBack }: SubscriptionManagementProps) {
+interface BillingRecord {
+  id: string;
+  amount: number;
+  currency: string;
+  status: 'paid' | 'pending' | 'failed';
+  description: string;
+  created_at: string;
+  subscription_tier: string;
+}
+
+export default function SubscriptionManagement({ onBack, onOpenPricing }: SubscriptionManagementProps) {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
+  const [loadingBilling, setLoadingBilling] = useState(true);
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      loadBillingHistory();
+    }
+  }, [user]);
+
+  const loadBillingHistory = async () => {
+    if (!user) return;
+
+    setLoadingBilling(true);
+    try {
+      // In a real implementation, you would have a billing_history table
+      // For now, we'll create some sample data based on the user's subscription
+      const mockBillingData: BillingRecord[] = [];
+      
+      if (user.subscription_tier !== 'free') {
+        const tierPrice = user.subscription_tier === 'pro' ? 4.99 : 7.99;
+        const currentDate = new Date();
+        
+        // Generate last 3 months of billing history
+        for (let i = 0; i < 3; i++) {
+          const billingDate = new Date(currentDate);
+          billingDate.setMonth(billingDate.getMonth() - i);
+          
+          mockBillingData.push({
+            id: `bill_${i + 1}`,
+            amount: tierPrice,
+            currency: 'USD',
+            status: 'paid',
+            description: `${user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)} Plan`,
+            created_at: billingDate.toISOString(),
+            subscription_tier: user.subscription_tier
+          });
+        }
+      }
+
+      setBillingHistory(mockBillingData);
+    } catch (error) {
+      console.error('Error loading billing history:', error);
+    } finally {
+      setLoadingBilling(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -43,8 +101,7 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
   };
 
   const handleUpgrade = () => {
-    // In a real app, this would redirect to payment flow
-    alert('Upgrade flow would be implemented here');
+    onOpenPricing?.();
   };
 
   const getTierInfo = (tier: string) => {
@@ -113,6 +170,27 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
     : user.subscription_tier === 'pro'
     ? Math.round(((user.monthly_exports_used || 0) / 200) * 100)
     : 0; // Premium has unlimited exports
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'text-emerald-600';
+      case 'pending':
+        return 'text-amber-600';
+      case 'failed':
+        return 'text-red-600';
+      default:
+        return 'text-gray-600';
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -254,40 +332,52 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
 
       {/* Billing History */}
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-lg">
-        <h3 className="text-lg font-bold text-gray-800 mb-6">Billing History</h3>
-        <div className="space-y-4">
-          {/* Mock billing history */}
-          <div className="flex items-center justify-between py-3 border-b border-gray-200">
-            <div>
-              <p className="text-gray-800 font-medium">{tierInfo.name} Plan</p>
-              <p className="text-gray-500 text-sm">December 1, 2024</p>
-            </div>
-            <div className="text-right">
-              <p className="text-gray-800 font-medium">{tierInfo.price}</p>
-              <p className="text-emerald-600 text-sm">Paid</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between py-3 border-b border-gray-200">
-            <div>
-              <p className="text-gray-800 font-medium">{tierInfo.name} Plan</p>
-              <p className="text-gray-500 text-sm">November 1, 2024</p>
-            </div>
-            <div className="text-right">
-              <p className="text-gray-800 font-medium">{tierInfo.price}</p>
-              <p className="text-emerald-600 text-sm">Paid</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between py-3">
-            <div>
-              <p className="text-gray-800 font-medium">{tierInfo.name} Plan</p>
-              <p className="text-gray-500 text-sm">October 1, 2024</p>
-            </div>
-            <div className="text-right">
-              <p className="text-gray-800 font-medium">{tierInfo.price}</p>
-              <p className="text-emerald-600 text-sm">Paid</p>
-            </div>
-          </div>
+        <div className="flex items-center gap-3 mb-6">
+          <Receipt className="w-5 h-5 text-gray-600" />
+          <h3 className="text-lg font-bold text-gray-800">Billing History</h3>
         </div>
+        
+        {loadingBilling ? (
+          <div className="text-center py-8">
+            <div className="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-gray-500 mt-2">Loading billing history...</p>
+          </div>
+        ) : billingHistory.length > 0 ? (
+          <div className="space-y-4">
+            {billingHistory.map((record) => (
+              <div key={record.id} className="flex items-center justify-between py-4 border-b border-gray-200 last:border-b-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="text-gray-800 font-medium">{record.description}</p>
+                    <p className="text-gray-500 text-sm">{formatDate(record.created_at)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-gray-800 font-medium">
+                    ${record.amount.toFixed(2)} {record.currency.toUpperCase()}
+                  </p>
+                  <p className={`text-sm capitalize ${getStatusColor(record.status)}`}>
+                    {record.status}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Receipt className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">No billing history available</p>
+            <p className="text-gray-400 text-sm mt-1">
+              {user.subscription_tier === 'free' 
+                ? 'Upgrade to a paid plan to see billing history'
+                : 'Billing records will appear here after your first payment'
+              }
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Cancel Confirmation Modal */}

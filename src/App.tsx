@@ -138,6 +138,7 @@ function App() {
         ) : (
           <SubscriptionManagement
             onBack={() => setCurrentView('capture')}
+            onOpenPricing={handleOpenPricing}
           />
         )}
       </main>
