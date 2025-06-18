@@ -92,13 +92,11 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
           credits: '90 credits/month max',
           color: 'from-gray-400 to-gray-500',
           features: [
-            '3 rewrites per day (90 max/month)',
+            '3 rewrites per day (90 per month)',
             'Basic style analysis',
-            'Standard processing',
             'Save up to 3 writing samples',
-            'Export up to 5 results/month',
-            'View-only tone controls',
-            'Community support'
+            '5 rewrites per month for export',
+            'Export results (limited to 5 rewrites per month)'
           ]
         };
     }
