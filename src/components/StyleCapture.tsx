@@ -226,7 +226,7 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
         <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-2xl sm:rounded-3xl mb-4 sm:mb-6 shadow-2xl">
           <Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
         </div>
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-3 sm:mb-4 px-4">
+        <h1 className="text-1xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-3 sm:mb-4 px-4">
           Capture Your Writing Style
         </h1>
         <div className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed px-4">
