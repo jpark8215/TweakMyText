@@ -81,7 +81,7 @@ App
 4. Style analysis performed on samples (subscription-level dependent)
 5. Text rewriting via Claude API or mock service (with priority processing)
 6. Results stored in `rewrite_history` table (with audit trail)
-7. Token/export tracking in `users` table (with security validation)
+7. Token tracking in `users` table (with security validation)
 8. All actions logged in `security_audit_log` table
 9. Proper state cleanup and redirect on sign-out
 
@@ -122,7 +122,7 @@ CREATE TABLE writing_samples (
 ```
 
 #### `rewrite_history` Table
-Historical record of all text rewrites.
+Historical record of all text rewrites (simplified token system).
 
 ```sql
 CREATE TABLE rewrite_history (
@@ -132,10 +132,11 @@ CREATE TABLE rewrite_history (
   rewritten_text text NOT NULL,
   confidence numeric NOT NULL CHECK (confidence >= 0 AND confidence <= 100),
   style_tags text[] NOT NULL DEFAULT '{}',
-  credits_used integer DEFAULT 1 CHECK (credits_used > 0),
   created_at timestamptz DEFAULT now()
 );
 ```
+
+**Note**: The `credits_used` column has been removed as tokens are now tracked at the user level only.
 
 #### `security_audit_log` Table
 Comprehensive security and access logging.
@@ -287,10 +288,19 @@ validateToneSettings(user: User | null, toneSettings: ToneSettings): void
 
 ## Token System
 
-### Token Management with Security
+### **Enhanced**: Token-Based Usage System
+
+The application has migrated from a credit-based system to a comprehensive token-based system for more granular usage tracking and better user experience.
+
+#### Token Allocation by Tier
 - **Free Tier**: 100,000 tokens/day, 1,000,000/month max (with daily limit enforcement)
 - **Pro Tier**: 5,000,000 tokens/month, no daily limit (with security validation)
 - **Premium Tier**: 10,000,000 tokens/month, no daily limit (with audit logging)
+
+#### Token Estimation
+- **Calculation**: Approximately 4 characters per token
+- **Real-time Display**: Users see estimated token usage before processing
+- **Accurate Tracking**: Actual usage tracked and deducted after processing
 
 ### **Enhanced**: Security-Enhanced Token Tracking
 ```typescript
@@ -324,6 +334,12 @@ The application uses intelligent token formatting for better user experience:
 - 1,000+ tokens displayed as "1K"
 - 1,000,000+ tokens displayed as "1M"
 - Real-time usage tracking with remaining token display
+
+### **Enhanced**: Database Schema Changes
+- **Removed**: `credits_used` column from `rewrite_history` table
+- **Added**: Comprehensive token tracking in `users` table
+- **Simplified**: Token deduction happens at user level only
+- **Improved**: Cleaner database schema with better performance
 
 ## Security & Audit System
 
@@ -672,6 +688,7 @@ npm run dev
    - `20250617015502_snowy_palace.sql` (security audit system)
    - `20250618005630_heavy_disk.sql` (billing history)
    - `20250618020049_crimson_spark.sql` (token system migration)
+   - `20250618021548_bold_island.sql` (remove credits_used column)
 
 ### Development Commands
 ```bash
@@ -931,6 +948,10 @@ SELECT * FROM billing_history WHERE user_id = auth.uid() LIMIT 5;
 -- Check token system migration
 SELECT tokens_remaining, daily_tokens_used, monthly_tokens_used 
 FROM users WHERE id = auth.uid();
+
+-- Verify rewrite_history table structure (credits_used should be removed)
+SELECT column_name FROM information_schema.columns 
+WHERE table_name = 'rewrite_history';
 ```
 
 #### **Enhanced**: API Integration Issues with Security
@@ -1044,6 +1065,7 @@ VITE_DEBUG=true
 - **v6**: Security audit system and subscription validation
 - **v7**: Billing history integration
 - **v8**: Token system migration and implementation
+- **v9**: Remove obsolete credits_used column
 
 ### **Enhanced**: Security Architecture
 - **Frontend**: Subscription validation + security error handling + session management + token tracking
