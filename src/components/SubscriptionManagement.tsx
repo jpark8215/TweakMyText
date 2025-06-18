@@ -73,15 +73,13 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
           color: 'from-amber-500 to-orange-500',
           features: [
             '300 rewrites per month',
-            'Extended style analysis',
-            'Fastest processing (3x speed)',
+            'Extended style analysis with confidence scoring',
             'Save up to 100 writing samples',
-            'Unlimited exports',
-            'Custom tone fine-tuning',
-            'Advanced presets',
-            'Full rewrite history',
-            'Bulk operations',
-            'Priority support'
+            'Unlimited exports & rewrite history (up to 300 rewrites)',
+            'Full rewrite history with analytics',
+            'Bulk rewrite operations',
+            'Custom tone fine-tuning with advanced presets',
+            'Fastest processing (3x speed)'
           ]
         };
       default:
