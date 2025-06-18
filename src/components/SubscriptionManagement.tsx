@@ -31,6 +31,16 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
     }
   }, [user]);
 
+  const formatTokens = (tokens: number) => {
+    if (tokens >= 1000000) {
+      return `${(tokens / 1000000).toFixed(1)}M`;
+    }
+    if (tokens >= 1000) {
+      return `${(tokens / 1000).toFixed(0)}K`;
+    }
+    return tokens.toString();
+  };
+
   const loadBillingHistory = async () => {
     if (!user) return;
 
@@ -41,7 +51,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       const mockBillingData: BillingRecord[] = [];
       
       if (user.subscription_tier !== 'free') {
-        const tierPrice = user.subscription_tier === 'pro' ? 4.99 : 7.99;
+        const tierPrice = user.subscription_tier === 'pro' ? 10 : 18;
         const currentDate = new Date();
         
         // Generate last 3 months of billing history
@@ -109,14 +119,15 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       case 'pro':
         return {
           name: 'Pro',
-          price: '$4.99/month',
-          credits: '200 credits/month',
+          price: '$10/month',
+          tokens: '5M tokens/month',
           color: 'from-blue-500 to-indigo-500',
           features: [
-            '200 rewrites per month',
+            '5,000,000 tokens per month',
+            'No daily token limits',
             'Advanced style analysis',
             'Save up to 25 writing samples',
-            'Export results (up to 200 rewrites)',
+            'Export results (up to 200 per month)',
             'Rewrite history access',
             'Access to basic tone presets',
             'Priority processing (2x faster)'
@@ -125,14 +136,15 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       case 'premium':
         return {
           name: 'Premium',
-          price: '$7.99/month',
-          credits: '300 credits/month',
+          price: '$18/month',
+          tokens: '10M tokens/month',
           color: 'from-amber-500 to-orange-500',
           features: [
-            '300 rewrites per month',
+            '10,000,000 tokens per month',
+            'No daily token limits',
             'Extended style analysis with confidence scoring',
             'Save up to 100 writing samples',
-            'Unlimited exports & rewrite history (up to 300 rewrites)',
+            'Unlimited exports & rewrite history',
             'Full rewrite history with analytics',
             'Bulk rewrite operations',
             'Custom tone fine-tuning with advanced presets',
@@ -143,14 +155,15 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         return {
           name: 'Free',
           price: 'Free',
-          credits: '90 credits/month max',
+          tokens: '1M tokens/month',
           color: 'from-gray-400 to-gray-500',
           features: [
-            '3 rewrites per day (90 per month)',
+            '1,000,000 tokens per month',
+            '100,000 tokens per day limit',
             'Basic style analysis',
             'Save up to 3 writing samples',
-            '5 rewrites per month for export',
-            'Export results (limited to 5 rewrites per month)'
+            '5 exports per month',
+            'Export results (limited to 5 per month)'
           ]
         };
     }
@@ -159,11 +172,11 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
   const tierInfo = getTierInfo(user.subscription_tier);
 
   // Calculate usage percentages
-  const creditUsagePercent = user.subscription_tier === 'free' 
-    ? Math.round((user.monthly_credits_used / 90) * 100)
+  const tokenUsagePercent = user.subscription_tier === 'free' 
+    ? Math.round((user.monthly_tokens_used / 1000000) * 100)
     : user.subscription_tier === 'pro'
-    ? Math.round((user.monthly_credits_used / 200) * 100)
-    : Math.round((user.monthly_credits_used / 300) * 100);
+    ? Math.round((user.monthly_tokens_used / 5000000) * 100)
+    : Math.round((user.monthly_tokens_used / 10000000) * 100);
 
   const exportUsagePercent = user.subscription_tier === 'free'
     ? Math.round(((user.monthly_exports_used || 0) / 5) * 100)
@@ -222,17 +235,17 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
           <div className="bg-gray-50 rounded-xl p-4">
             <div className="flex items-center gap-3 mb-2">
               <Zap className="w-5 h-5 text-amber-600" />
-              <span className="text-gray-800 font-medium">Credits</span>
+              <span className="text-gray-800 font-medium">Tokens</span>
             </div>
-            <p className="text-gray-600 text-sm mb-2">{tierInfo.credits}</p>
+            <p className="text-gray-600 text-sm mb-2">{tierInfo.tokens}</p>
             <div className="flex items-center justify-between">
-              <p className="text-blue-600 text-lg font-bold">{user.credits_remaining} remaining</p>
-              <span className="text-xs text-gray-500">{creditUsagePercent}% used</span>
+              <p className="text-blue-600 text-lg font-bold">{formatTokens(user.tokens_remaining)} remaining</p>
+              <span className="text-xs text-gray-500">{tokenUsagePercent}% used</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
                 className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${creditUsagePercent}%` }}
+                style={{ width: `${tokenUsagePercent}%` }}
               />
             </div>
           </div>

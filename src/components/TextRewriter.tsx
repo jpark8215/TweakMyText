@@ -11,7 +11,7 @@ import ComparisonView from './ComparisonView';
 interface TextRewriterProps {
   samples: WritingSample[];
   onBack: () => void;
-  onOpenPricing?: () => void; // Add this prop
+  onOpenPricing?: () => void;
 }
 
 export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRewriterProps) {
@@ -27,7 +27,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
   });
   const [securityError, setSecurityError] = useState<string | null>(null);
 
-  const { user, updateCredits, updateExports } = useAuth();
+  const { user, updateTokens, updateExports } = useAuth();
 
   // Analyze samples and set initial tone settings when component mounts or samples change
   useEffect(() => {
@@ -44,27 +44,50 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
 
   const limits = getSubscriptionLimits(user);
 
+  const formatTokens = (tokens: number) => {
+    if (tokens >= 1000000) {
+      return `${(tokens / 1000000).toFixed(1)}M`;
+    }
+    if (tokens >= 1000) {
+      return `${(tokens / 1000).toFixed(0)}K`;
+    }
+    return tokens.toString();
+  };
+
+  const estimateTokenUsage = (text: string) => {
+    // Rough estimation: ~4 characters per token
+    return Math.ceil(text.length / 4);
+  };
+
   const handleRewrite = async () => {
     if (!inputText.trim() || !user) return;
     
     setSecurityError(null);
     
-    // Check if user has credits
-    if (user.credits_remaining <= 0) {
-      alert('You have no credits remaining. Please wait for your daily reset or upgrade your plan.');
+    const estimatedTokens = estimateTokenUsage(inputText);
+    
+    // Check if user has tokens
+    if (user.tokens_remaining <= 0) {
+      alert('You have no tokens remaining. Please wait for your daily reset or upgrade your plan.');
+      return;
+    }
+
+    // Check if estimated usage exceeds remaining tokens
+    if (estimatedTokens > user.tokens_remaining) {
+      alert(`This text requires approximately ${formatTokens(estimatedTokens)} tokens, but you only have ${formatTokens(user.tokens_remaining)} remaining.`);
       return;
     }
 
     // Check daily limit for free users
-    if (user.subscription_tier === 'free' && user.daily_credits_used >= 3) {
-      alert('You have reached your daily limit of 3 rewrites. Credits reset at midnight UTC.');
+    if (user.subscription_tier === 'free' && user.daily_tokens_used >= 100000) {
+      alert('You have reached your daily limit of 100,000 tokens. Tokens reset at midnight UTC.');
       return;
     }
 
     // Check monthly limit
     const monthlyLimit = limits.monthlyLimit;
-    if (user.monthly_credits_used >= monthlyLimit) {
-      alert(`You have reached your monthly limit of ${monthlyLimit} rewrites. ${user.subscription_tier === 'free' ? 'Upgrade to Pro or Premium for more credits.' : 'Limit resets on your signup anniversary.'}`);
+    if (user.monthly_tokens_used >= monthlyLimit) {
+      alert(`You have reached your monthly limit of ${formatTokens(monthlyLimit)} tokens. ${user.subscription_tier === 'free' ? 'Upgrade to Pro or Premium for more tokens.' : 'Limit resets on your signup anniversary.'}`);
       return;
     }
     
@@ -75,9 +98,8 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
       
       setResult(rewriteResult);
 
-      // Deduct credits and save to database
-      const creditsUsed = 1;
-      const { error } = await updateCredits(creditsUsed);
+      // Deduct tokens and save to database
+      const { error } = await updateTokens(estimatedTokens);
       
       if (error) {
         alert(error.message);
@@ -91,7 +113,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         rewritten_text: rewriteResult.rewritten,
         confidence: rewriteResult.confidence,
         style_tags: rewriteResult.styleTags,
-        credits_used: creditsUsed,
+        credits_used: 1, // Keep for compatibility, but tokens are tracked separately
       });
 
     } catch (error: any) {
@@ -153,7 +175,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         tier: user.subscription_tier,
         analysisType: limits.hasExtendedAnalysis ? 'Extended' : limits.hasAdvancedAnalysis ? 'Advanced' : 'Basic',
         processingPriority: limits.hasPriorityProcessing ? (user.subscription_tier === 'premium' ? '3x Speed' : '2x Speed') : 'Standard',
-        securityValidated: true, // Mark as security validated export
+        securityValidated: true,
       };
       
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -177,9 +199,9 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
     }
   };
 
-  const canRewrite = user && user.credits_remaining > 0 && inputText.trim() && 
-    (user.subscription_tier !== 'free' || (user.daily_credits_used < 3 && user.monthly_credits_used < 90)) &&
-    user.monthly_credits_used < limits.monthlyLimit;
+  const canRewrite = user && user.tokens_remaining > 0 && inputText.trim() && 
+    (user.subscription_tier !== 'free' || (user.daily_tokens_used < 100000 && user.monthly_tokens_used < 1000000)) &&
+    user.monthly_tokens_used < limits.monthlyLimit;
 
   const canExport = user && result && 
     (user.subscription_tier === 'premium' || 
@@ -230,15 +252,15 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           {user && (
             <div className="flex items-center gap-2 px-3 py-2 bg-white/80 rounded-lg border border-gray-200 text-sm">
               <Zap className="w-4 h-4 text-amber-500" />
-              <span className="text-gray-800 font-medium">{user.credits_remaining}</span>
+              <span className="text-gray-800 font-medium">{formatTokens(user.tokens_remaining)}</span>
               {user.subscription_tier === 'free' && (
                 <span className="text-xs text-gray-500">
-                  ({user.daily_credits_used}/3 today)
+                  ({formatTokens(user.daily_tokens_used)}/100K today)
                 </span>
               )}
               {user.subscription_tier !== 'free' && (
                 <span className="text-xs text-gray-500">
-                  ({user.monthly_credits_used}/{limits.monthlyLimit} month)
+                  ({formatTokens(user.monthly_tokens_used)}/{formatTokens(limits.monthlyLimit)} month)
                 </span>
               )}
             </div>
@@ -273,19 +295,19 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         </div>
       )}
 
-      {/* Credits Warning */}
+      {/* Token Warnings */}
       {user && (
         <div className="mb-4 sm:mb-6 lg:mb-8 space-y-3 sm:space-y-4">
-          {user.credits_remaining === 0 && (
+          {user.tokens_remaining === 0 && (
             <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
               <div className="flex items-center gap-3">
                 <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
                 <div>
-                  <p className="text-red-700 font-medium text-sm sm:text-base">No credits remaining</p>
+                  <p className="text-red-700 font-medium text-sm sm:text-base">No tokens remaining</p>
                   <p className="text-red-600 text-xs sm:text-sm">
                     {user.subscription_tier === 'free' 
-                      ? `Your daily credits will reset in ${getTimeUntilReset()} hours at midnight UTC.`
-                      : 'Your monthly credits will reset on your signup anniversary.'
+                      ? `Your daily tokens will reset in ${getTimeUntilReset()} hours at midnight UTC.`
+                      : 'Your monthly tokens will reset on your signup anniversary.'
                     }
                   </p>
                 </div>
@@ -293,27 +315,27 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
             </div>
           )}
           
-          {user.subscription_tier === 'free' && user.daily_credits_used >= 3 && user.credits_remaining > 0 && (
+          {user.subscription_tier === 'free' && user.daily_tokens_used >= 100000 && user.tokens_remaining > 0 && (
             <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <div className="flex items-center gap-3">
                 <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 flex-shrink-0" />
                 <div>
                   <p className="text-amber-800 font-medium text-sm sm:text-base">Daily limit reached</p>
                   <p className="text-amber-700 text-xs sm:text-sm">
-                    You've used your 3 daily credits. Reset in {getTimeUntilReset()} hours.
+                    You've used your 100,000 daily tokens. Reset in {getTimeUntilReset()} hours.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {user.monthly_credits_used >= limits.monthlyLimit - 10 && user.monthly_credits_used < limits.monthlyLimit && (
+          {user.monthly_tokens_used >= limits.monthlyLimit - 100000 && user.monthly_tokens_used < limits.monthlyLimit && (
             <div className="p-3 sm:p-4 bg-orange-50 border border-orange-200 rounded-xl">
               <div className="flex items-center gap-3">
                 <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 flex-shrink-0" />
                 <div>
                   <p className="text-orange-800 font-medium text-sm sm:text-base">
-                    {limits.monthlyLimit - user.monthly_credits_used} credits left this month
+                    {formatTokens(limits.monthlyLimit - user.monthly_tokens_used)} tokens left this month
                   </p>
                   <p className="text-orange-700 text-xs sm:text-sm">
                     Monthly limit resets on day {user.monthly_reset_date} of each month.
@@ -323,14 +345,14 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
             </div>
           )}
 
-          {user.monthly_credits_used >= limits.monthlyLimit && (
+          {user.monthly_tokens_used >= limits.monthlyLimit && (
             <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
               <div className="flex items-center gap-3">
                 <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
                 <div>
                   <p className="text-red-700 font-medium text-sm sm:text-base">Monthly limit reached</p>
                   <p className="text-red-600 text-xs sm:text-sm">
-                    You've used all {limits.monthlyLimit} monthly credits. Limit resets on day {user.monthly_reset_date}.
+                    You've used all {formatTokens(limits.monthlyLimit)} monthly tokens. Limit resets on day {user.monthly_reset_date}.
                   </p>
                 </div>
               </div>
@@ -397,9 +419,10 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         />
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-6 mt-3 sm:mt-4 lg:mt-6">
-          <span className="text-sm text-gray-500">
-            {inputText.split(' ').filter(w => w.trim()).length} words
-          </span>
+          <div className="flex items-center gap-4 text-sm text-gray-500">
+            <span>{inputText.split(' ').filter(w => w.trim()).length} words</span>
+            <span>~{formatTokens(estimateTokenUsage(inputText))} tokens</span>
+          </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
             {result && (
               <button
@@ -435,12 +458,12 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
                   <span className="sm:hidden">Rewrite</span>
                   {user && user.subscription_tier === 'free' && (
                     <span className="text-xs opacity-75 hidden lg:inline">
-                      ({user.credits_remaining} left today)
+                      ({formatTokens(user.tokens_remaining)} left today)
                     </span>
                   )}
                   {user && user.subscription_tier !== 'free' && (
                     <span className="text-xs opacity-75 hidden lg:inline">
-                      ({limits.monthlyLimit - user.monthly_credits_used} left)
+                      ({formatTokens(limits.monthlyLimit - user.monthly_tokens_used)} left)
                     </span>
                   )}
                 </>

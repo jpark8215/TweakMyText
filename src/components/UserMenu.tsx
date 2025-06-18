@@ -15,6 +15,16 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
 
   if (!user) return null;
 
+  const formatTokens = (tokens: number) => {
+    if (tokens >= 1000000) {
+      return `${(tokens / 1000000).toFixed(1)}M`;
+    }
+    if (tokens >= 1000) {
+      return `${(tokens / 1000).toFixed(0)}K`;
+    }
+    return tokens.toString();
+  };
+
   const handleSignOut = async () => {
     if (isSigningOut) return; // Prevent multiple clicks
     
@@ -111,7 +121,7 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
               <div className="flex items-center gap-2 text-sm">
                 <Zap className="w-4 h-4 text-amber-500" />
                 <span className="text-gray-700">
-                  {user.credits_remaining} credits remaining
+                  {formatTokens(user.tokens_remaining)} tokens remaining
                 </span>
               </div>
             </div>

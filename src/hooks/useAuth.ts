@@ -44,7 +44,6 @@ export const useAuth = () => {
               subscriptionTier: user.subscription_tier,
             });
           }
-          // Clear user state immediately on sign out
           setUser(null);
           setLoading(false);
         }
@@ -56,9 +55,9 @@ export const useAuth = () => {
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
-      // Reset daily/monthly credits if needed
-      await supabase.rpc('reset_daily_credits');
-      await supabase.rpc('reset_monthly_credits');
+      // Reset daily/monthly tokens if needed
+      await supabase.rpc('reset_daily_tokens');
+      await supabase.rpc('reset_monthly_tokens');
 
       const { data, error } = await supabase
         .from('users')
@@ -72,11 +71,11 @@ export const useAuth = () => {
           id: authUser.id,
           email: authUser.email!,
           subscription_tier: 'free' as const,
-          credits_remaining: 3,
-          daily_credits_used: 0,
-          monthly_credits_used: 0,
+          tokens_remaining: 100000, // Daily limit for free tier
+          daily_tokens_used: 0,
+          monthly_tokens_used: 0,
           monthly_exports_used: 0,
-          last_credit_reset: new Date().toISOString().split('T')[0],
+          last_token_reset: new Date().toISOString().split('T')[0],
           monthly_reset_date: new Date().getDate(),
         };
 
@@ -206,14 +205,14 @@ export const useAuth = () => {
     }
   };
 
-  const updateCredits = async (creditsUsed: number) => {
+  const updateTokens = async (tokensUsed: number) => {
     if (!user) return { error: new Error('No user found') };
 
-    // Log credit usage attempt
+    // Log token usage attempt
     await logSecurityEvent({
       userId: user.id,
-      action: 'credit_usage_attempt',
-      resource: 'credits',
+      action: 'token_usage_attempt',
+      resource: 'tokens',
       allowed: true,
       subscriptionTier: user.subscription_tier,
     });
@@ -222,11 +221,11 @@ export const useAuth = () => {
     const getSubscriptionLimits = () => {
       switch (user.subscription_tier) {
         case 'pro':
-          return { dailyLimit: -1, monthlyLimit: 200 }; // No daily limit for Pro
+          return { dailyLimit: -1, monthlyLimit: 5000000 }; // No daily limit for Pro
         case 'premium':
-          return { dailyLimit: -1, monthlyLimit: 300 }; // No daily limit for Premium
+          return { dailyLimit: -1, monthlyLimit: 10000000 }; // No daily limit for Premium
         default:
-          return { dailyLimit: 3, monthlyLimit: 90 }; // Free tier
+          return { dailyLimit: 100000, monthlyLimit: 1000000 }; // Free tier
       }
     };
 
@@ -237,122 +236,122 @@ export const useAuth = () => {
       const today = new Date().toISOString().split('T')[0];
       const currentDay = new Date().getDate();
       
-      // Reset daily credits if it's a new day
-      if (user.last_credit_reset !== today) {
-        const maxDailyCredits = Math.min(3, limits.monthlyLimit - user.monthly_credits_used);
+      // Reset daily tokens if it's a new day
+      if (user.last_token_reset !== today) {
+        const maxDailyTokens = Math.min(100000, limits.monthlyLimit - user.monthly_tokens_used);
         await supabase
           .from('users')
           .update({ 
-            credits_remaining: maxDailyCredits,
-            daily_credits_used: 0,
-            last_credit_reset: today
+            tokens_remaining: maxDailyTokens,
+            daily_tokens_used: 0,
+            last_token_reset: today
           })
           .eq('id', user.id);
         
         setUser({ 
           ...user, 
-          credits_remaining: maxDailyCredits,
-          daily_credits_used: 0,
-          last_credit_reset: today
+          tokens_remaining: maxDailyTokens,
+          daily_tokens_used: 0,
+          last_token_reset: today
         });
       }
 
-      // Reset monthly credits if it's the monthly reset day
-      if (currentDay === user.monthly_reset_date && user.last_credit_reset !== today) {
+      // Reset monthly tokens if it's the monthly reset day
+      if (currentDay === user.monthly_reset_date && user.last_token_reset !== today) {
         await supabase
           .from('users')
           .update({ 
-            monthly_credits_used: 0,
+            monthly_tokens_used: 0,
             monthly_exports_used: 0,
-            credits_remaining: 3,
-            daily_credits_used: 0
+            tokens_remaining: 100000,
+            daily_tokens_used: 0
           })
           .eq('id', user.id);
         
         setUser({ 
           ...user, 
-          monthly_credits_used: 0,
+          monthly_tokens_used: 0,
           monthly_exports_used: 0,
-          credits_remaining: 3,
-          daily_credits_used: 0
+          tokens_remaining: 100000,
+          daily_tokens_used: 0
         });
       }
 
       // Check if user has exceeded monthly limit
-      if (user.monthly_credits_used >= limits.monthlyLimit) {
+      if (user.monthly_tokens_used >= limits.monthlyLimit) {
         await logSecurityEvent({
           userId: user.id,
-          action: 'credit_limit_exceeded',
-          resource: 'credits',
+          action: 'token_limit_exceeded',
+          resource: 'tokens',
           allowed: false,
           subscriptionTier: user.subscription_tier,
-          errorMessage: `Monthly credit limit reached (${limits.monthlyLimit} credits)`,
+          errorMessage: `Monthly token limit reached (${limits.monthlyLimit} tokens)`,
         });
-        return { error: new Error(`Monthly credit limit reached (${limits.monthlyLimit} credits)`) };
+        return { error: new Error(`Monthly token limit reached (${limits.monthlyLimit} tokens)`) };
       }
 
       // Check if user has exceeded daily limit
-      if (user.daily_credits_used >= limits.dailyLimit) {
+      if (user.daily_tokens_used >= limits.dailyLimit) {
         await logSecurityEvent({
           userId: user.id,
-          action: 'daily_credit_limit_exceeded',
-          resource: 'credits',
+          action: 'daily_token_limit_exceeded',
+          resource: 'tokens',
           allowed: false,
           subscriptionTier: user.subscription_tier,
-          errorMessage: `Daily credit limit reached (${limits.dailyLimit} credits)`,
+          errorMessage: `Daily token limit reached (${limits.dailyLimit} tokens)`,
         });
-        return { error: new Error(`Daily credit limit reached (${limits.dailyLimit} credits)`) };
+        return { error: new Error(`Daily token limit reached (${limits.dailyLimit} tokens)`) };
       }
     } else {
       // For Pro/Premium users, only check monthly limits
-      if (user.monthly_credits_used >= limits.monthlyLimit) {
+      if (user.monthly_tokens_used >= limits.monthlyLimit) {
         await logSecurityEvent({
           userId: user.id,
-          action: 'monthly_credit_limit_exceeded',
-          resource: 'credits',
+          action: 'monthly_token_limit_exceeded',
+          resource: 'tokens',
           allowed: false,
           subscriptionTier: user.subscription_tier,
-          errorMessage: `Monthly credit limit reached (${limits.monthlyLimit} credits)`,
+          errorMessage: `Monthly token limit reached (${limits.monthlyLimit} tokens)`,
         });
-        return { error: new Error(`Monthly credit limit reached (${limits.monthlyLimit} credits)`) };
+        return { error: new Error(`Monthly token limit reached (${limits.monthlyLimit} tokens)`) };
       }
     }
 
-    const newCredits = Math.max(0, user.credits_remaining - creditsUsed);
-    const newDailyUsed = user.daily_credits_used + creditsUsed;
-    const newMonthlyUsed = user.monthly_credits_used + creditsUsed;
+    const newTokens = Math.max(0, user.tokens_remaining - tokensUsed);
+    const newDailyUsed = user.daily_tokens_used + tokensUsed;
+    const newMonthlyUsed = user.monthly_tokens_used + tokensUsed;
     
     const { error } = await supabase
       .from('users')
       .update({ 
-        credits_remaining: newCredits,
-        daily_credits_used: newDailyUsed,
-        monthly_credits_used: newMonthlyUsed
+        tokens_remaining: newTokens,
+        daily_tokens_used: newDailyUsed,
+        monthly_tokens_used: newMonthlyUsed
       })
       .eq('id', user.id);
 
     if (!error) {
       setUser({ 
         ...user, 
-        credits_remaining: newCredits,
-        daily_credits_used: newDailyUsed,
-        monthly_credits_used: newMonthlyUsed
+        tokens_remaining: newTokens,
+        daily_tokens_used: newDailyUsed,
+        monthly_tokens_used: newMonthlyUsed
       });
 
-      // Log successful credit usage
+      // Log successful token usage
       await logSecurityEvent({
         userId: user.id,
-        action: 'credits_used',
-        resource: 'credits',
+        action: 'tokens_used',
+        resource: 'tokens',
         allowed: true,
         subscriptionTier: user.subscription_tier,
       });
     } else {
-      // Log credit update error
+      // Log token update error
       await logSecurityEvent({
         userId: user.id,
-        action: 'credit_update_error',
-        resource: 'credits',
+        action: 'token_update_error',
+        resource: 'tokens',
         allowed: false,
         subscriptionTier: user.subscription_tier,
         errorMessage: error.message,
@@ -451,7 +450,7 @@ export const useAuth = () => {
     signIn,
     signUp,
     signOut,
-    updateCredits,
+    updateTokens,
     updateExports,
   };
 };

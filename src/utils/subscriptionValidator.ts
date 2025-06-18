@@ -43,7 +43,7 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         processingPriority: 'premium',
         maxWritingSamples: 100,
         dailyLimit: -1, // Unlimited
-        monthlyLimit: 300,
+        monthlyLimit: 10000000,
         exportLimit: -1, // Unlimited
       };
     case 'pro':
@@ -57,7 +57,7 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         processingPriority: 'priority',
         maxWritingSamples: 25,
         dailyLimit: -1, // Unlimited
-        monthlyLimit: 200,
+        monthlyLimit: 5000000,
         exportLimit: 200,
       };
     default: // free
@@ -70,8 +70,8 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         hasPriorityProcessing: false,
         processingPriority: 'standard',
         maxWritingSamples: 3,
-        dailyLimit: 3,
-        monthlyLimit: 90,
+        dailyLimit: 100000,
+        monthlyLimit: 1000000,
         exportLimit: 5,
       };
   }

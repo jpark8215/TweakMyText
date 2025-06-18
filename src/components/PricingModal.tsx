@@ -12,18 +12,19 @@ const pricingTiers: PricingTier[] = [
     id: 'free',
     name: 'Free',
     price: 0,
-    credits: 90,
+    tokens: 1000000,
     features: [
-      '3 rewrites per day (90 per month)',
+      '1,000,000 tokens per month',
+      '100,000 tokens per day limit',
       'Basic style analysis',
       'Save up to 3 writing samples',
-      '5 rewrites per month for export',
-      'Export results (limited to 5 rewrites per month)'
+      '5 exports per month',
+      'Export results (limited to 5 per month)'
     ],
     limits: {
       writingSamples: 3,
-      dailyRewrites: 3,
-      monthlyRewrites: 90,
+      dailyTokens: 100000,
+      monthlyTokens: 1000000,
       monthlyExports: 5,
       processingSpeed: 1,
       exportFormats: ['JSON'],
@@ -36,12 +37,13 @@ const pricingTiers: PricingTier[] = [
     id: 'pro',
     name: 'Pro',
     price: 10,
-    credits: 200,
+    tokens: 5000000,
     features: [
-      '200 rewrites per month',
+      '5,000,000 tokens per month',
+      'No daily token limits',
       'Advanced style analysis',
       'Save up to 25 writing samples',
-      'Export results (up to 200 rewrites)',
+      'Export results (up to 200 per month)',
       'Rewrite history access',
       'Access to basic tone presets',
       'Priority processing (2x faster)'
@@ -49,8 +51,8 @@ const pricingTiers: PricingTier[] = [
     popular: true,
     limits: {
       writingSamples: 25,
-      dailyRewrites: -1, // No daily limit
-      monthlyRewrites: 200,
+      dailyTokens: -1, // No daily limit
+      monthlyTokens: 5000000,
       monthlyExports: 200,
       processingSpeed: 2,
       exportFormats: ['JSON', 'TXT'],
@@ -63,12 +65,13 @@ const pricingTiers: PricingTier[] = [
     id: 'premium',
     name: 'Premium',
     price: 18,
-    credits: 300,
+    tokens: 10000000,
     features: [
-      '300 rewrites per month',
+      '10,000,000 tokens per month',
+      'No daily token limits',
       'Extended style analysis with confidence scoring',
       'Save up to 100 writing samples',
-      'Unlimited exports & rewrite history (up to 300 rewrites)',
+      'Unlimited exports & rewrite history',
       'Full rewrite history with analytics',
       'Bulk rewrite operations',
       'Custom tone fine-tuning with advanced presets',
@@ -76,8 +79,8 @@ const pricingTiers: PricingTier[] = [
     ],
     limits: {
       writingSamples: 100,
-      dailyRewrites: -1, // No daily limit
-      monthlyRewrites: 300,
+      dailyTokens: -1, // No daily limit
+      monthlyTokens: 10000000,
       monthlyExports: -1, // Unlimited
       processingSpeed: 3,
       exportFormats: ['JSON', 'TXT', 'DOCX'],
@@ -97,6 +100,16 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
     // In a real app, this would integrate with Stripe or another payment processor
     console.log('Upgrading to:', tierId);
     alert('Payment integration would be implemented here');
+  };
+
+  const formatTokens = (tokens: number) => {
+    if (tokens >= 1000000) {
+      return `${(tokens / 1000000).toFixed(1)}M`;
+    }
+    if (tokens >= 1000) {
+      return `${(tokens / 1000).toFixed(0)}K`;
+    }
+    return tokens.toString();
   };
 
   return (
@@ -148,7 +161,10 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
                 <div className="flex items-center justify-center gap-2 mt-2 text-blue-600">
                   <Zap className="w-4 h-4" />
                   <span className="text-sm">
-                    {tier.id === 'free' ? '3/day (90 max)' : `${tier.credits} credits/month`}
+                    {tier.id === 'free' 
+                      ? `${formatTokens(tier.tokens)} tokens/month (${formatTokens(100000)}/day limit)`
+                      : `${formatTokens(tier.tokens)} tokens/month`
+                    }
                   </span>
                 </div>
               </div>
@@ -191,11 +207,11 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
             <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">Feature Comparison</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div className="space-y-2">
-                <h4 className="font-medium text-blue-600">Writing Samples</h4>
+                <h4 className="font-medium text-blue-600">Token Limits</h4>
                 <div className="space-y-1 text-gray-700">
-                  <div>Free: Up to 3 samples</div>
-                  <div>Pro: Up to 25 samples</div>
-                  <div>Premium: Up to 100 samples</div>
+                  <div>Free: 1M/month (100K/day)</div>
+                  <div>Pro: 5M/month (no daily limit)</div>
+                  <div>Premium: 10M/month (no daily limit)</div>
                 </div>
               </div>
               <div className="space-y-2">

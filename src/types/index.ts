@@ -34,11 +34,11 @@ export interface User {
   id: string;
   email: string;
   subscription_tier: 'free' | 'pro' | 'premium';
-  credits_remaining: number;
-  daily_credits_used: number;
-  monthly_credits_used: number;
-  monthly_exports_used: number; // New field for tracking exports
-  last_credit_reset: string;
+  tokens_remaining: number;
+  daily_tokens_used: number;
+  monthly_tokens_used: number;
+  monthly_exports_used: number;
+  last_token_reset: string;
   monthly_reset_date: number;
   subscription_expires_at?: Date;
   created_at: Date;
@@ -48,14 +48,14 @@ export interface PricingTier {
   id: string;
   name: string;
   price: number;
-  credits: number;
+  tokens: number;
   features: string[];
   popular?: boolean;
   limits?: {
     writingSamples: number;
-    dailyRewrites: number;
-    monthlyRewrites: number;
-    monthlyExports: number; // New field for export limits
+    dailyTokens: number;
+    monthlyTokens: number;
+    monthlyExports: number;
     processingSpeed: number; // multiplier (1x, 2x, 3x)
     exportFormats: string[];
     historyAccess: boolean;
@@ -66,15 +66,15 @@ export interface PricingTier {
 
 export interface UsageStats {
   total_rewrites: number;
-  credits_used: number;
+  tokens_used: number;
   last_rewrite: Date;
 }
 
 export interface SubscriptionLimits {
   maxWritingSamples: number;
-  dailyRewriteLimit: number;
-  monthlyRewriteLimit: number;
-  monthlyExportLimit: number; // New field for export limits
+  dailyTokenLimit: number;
+  monthlyTokenLimit: number;
+  monthlyExportLimit: number;
   processingPriority: 'standard' | 'high' | 'premium';
   exportFormats: string[];
   historyRetention: number; // days
