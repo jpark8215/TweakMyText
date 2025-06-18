@@ -15,9 +15,9 @@ const pricingTiers: PricingTier[] = [
     credits: 90,
     features: [
       '3 rewrites per day (90 per month)',
-      '5 rewrites per month for export',
       'Basic style analysis',
       'Save up to 3 writing samples',
+      '5 rewrites per month for export',
       'Export results (limited to 5 rewrites per month)'
     ],
     limits: {
@@ -40,12 +40,11 @@ const pricingTiers: PricingTier[] = [
     features: [
       '200 rewrites per month',
       'Advanced style analysis',
-      'Priority processing (2x faster)',
       'Save up to 25 writing samples',
       'Export results (up to 200 rewrites)',
-      'Access to basic tone presets',
       'Rewrite history access',
-      'Email support'
+      'Access to basic tone presets',
+      'Priority processing (2x faster)'
     ],
     popular: true,
     limits: {
@@ -68,14 +67,12 @@ const pricingTiers: PricingTier[] = [
     features: [
       '300 rewrites per month',
       'Extended style analysis with confidence scoring',
-      'Fastest processing (3x speed)',
       'Save up to 100 writing samples',
       'Unlimited exports & rewrite history (up to 300 rewrites)',
-      'Custom tone fine-tuning with advanced presets',
       'Full rewrite history with analytics',
       'Bulk rewrite operations',
-      'Priority email support',
-      'Early access to new features'
+      'Custom tone fine-tuning with advanced presets',
+      'Fastest processing (3x speed)'
     ],
     limits: {
       writingSamples: 100,
