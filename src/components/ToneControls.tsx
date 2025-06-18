@@ -111,23 +111,23 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
   ];
 
   return (
-    <div className="bg-white/80 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-lg">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 mb-6 sm:mb-8">
+    <div className="bg-white/80 backdrop-blur-xl rounded-lg sm:rounded-xl lg:rounded-2xl border border-gray-200 p-4 sm:p-6 lg:p-8 shadow-lg">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg sm:rounded-xl flex items-center justify-center">
-            <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          <div className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-md sm:rounded-lg lg:rounded-xl flex items-center justify-center">
+            <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Tone Controls</h3>
+              <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-800">Tone Controls</h3>
               {hasTonePresets && (
-                <Crown className="w-4 h-4 text-amber-500" />
+                <Crown className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
               )}
               {hasCustomTuning && (
-                <Star className="w-4 h-4 text-amber-500" />
+                <Star className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
               )}
               {!canModifyTone && (
-                <Lock className="w-4 h-4 text-gray-400" />
+                <Lock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
               )}
             </div>
             <p className="text-xs sm:text-sm text-gray-500">
@@ -140,7 +140,7 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
         </div>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg self-end sm:self-auto"
+          className="text-gray-400 hover:text-gray-600 transition-colors p-1 sm:p-1.5 lg:p-2 hover:bg-gray-100 rounded-lg self-end sm:self-auto"
         >
           <X className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
@@ -148,15 +148,15 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
 
       {/* Free Tier Upgrade Notice */}
       {!canModifyTone && (
-        <div className="mb-6 sm:mb-8 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+        <div className="mb-4 sm:mb-6 lg:mb-8 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
           <div className="flex items-center gap-3 mb-2">
-            <Lock className="w-5 h-5 text-blue-600" />
-            <h4 className="text-gray-800 font-medium">Tone Controls Locked</h4>
+            <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+            <h4 className="text-gray-800 font-medium text-sm sm:text-base">Tone Controls Locked</h4>
           </div>
-          <p className="text-gray-700 text-sm mb-3">
+          <p className="text-gray-700 text-xs sm:text-sm mb-3">
             Tone settings are automatically detected from your writing samples. Upgrade to Pro or Premium to customize tone controls.
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <div className="text-xs text-blue-700 bg-blue-100 border border-blue-200 rounded px-2 py-1">
               Pro: Manual tone adjustment + presets
             </div>
@@ -166,9 +166,9 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
           </div>
           <button
             onClick={handleUpgradeClick}
-            className="mt-3 w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm"
+            className="mt-3 w-full sm:w-auto px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-xs sm:text-sm"
           >
-            <Crown className="w-4 h-4 inline mr-2" />
+            <Crown className="w-3 h-3 sm:w-4 sm:h-4 inline mr-2" />
             Upgrade to Unlock Tone Controls
           </button>
         </div>
@@ -176,10 +176,10 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
 
       {/* Basic Tone Presets for Pro users */}
       {hasTonePresets && (
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <h4 className="text-base font-medium text-gray-800">Quick Presets</h4>
+        <div className="mb-4 sm:mb-6 lg:mb-8">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" />
+            <h4 className="text-sm sm:text-base font-medium text-gray-800">Quick Presets</h4>
             {!hasCustomTuning && (
               <div className="text-xs text-blue-700 bg-blue-100 border border-blue-200 rounded px-2 py-1">
                 Pro
@@ -192,7 +192,7 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
                 key={preset.name}
                 onClick={() => applyPreset(preset)}
                 disabled={!hasTonePresets}
-                className="px-3 py-2 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 text-xs sm:text-sm font-medium rounded-lg border border-blue-200 hover:border-blue-300 transition-all backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-2 sm:px-3 py-1.5 sm:py-2 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 text-xs sm:text-sm font-medium rounded-lg border border-blue-200 hover:border-blue-300 transition-all backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {preset.name}
               </button>
@@ -203,10 +203,10 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
 
       {/* Advanced Presets for Premium users only */}
       {hasCustomTuning && (
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Settings className="w-4 h-4 text-amber-600" />
-            <h4 className="text-base font-medium text-gray-800">Advanced Presets</h4>
+        <div className="mb-4 sm:mb-6 lg:mb-8">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <Settings className="w-3 h-3 sm:w-4 sm:h-4 text-amber-600" />
+            <h4 className="text-sm sm:text-base font-medium text-gray-800">Advanced Presets</h4>
             <div className="text-xs text-amber-700 bg-amber-100 border border-amber-200 rounded px-2 py-1 flex items-center gap-1">
               <Star className="w-3 h-3" />
               Premium
@@ -217,7 +217,7 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
               <button
                 key={preset.name}
                 onClick={() => applyAdvancedPreset(preset)}
-                className="px-3 py-2 bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 text-xs sm:text-sm font-medium rounded-lg border border-amber-200 hover:border-amber-300 transition-all backdrop-blur-sm"
+                className="px-2 sm:px-3 py-1.5 sm:py-2 bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 text-xs sm:text-sm font-medium rounded-lg border border-amber-200 hover:border-amber-300 transition-all backdrop-blur-sm"
               >
                 {preset.name}
               </button>
@@ -226,11 +226,11 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
         </div>
       )}
 
-      <div className="grid gap-6 sm:gap-8 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:gap-8 md:grid-cols-2">
         {sliders.map((slider) => (
-          <div key={slider.key} className="space-y-3 sm:space-y-4">
+          <div key={slider.key} className="space-y-2 sm:space-y-3 lg:space-y-4">
             <div>
-              <label className="text-base sm:text-lg font-medium text-gray-800">
+              <label className="text-sm sm:text-base lg:text-lg font-medium text-gray-800">
                 {slider.label}
                 {hasCustomTuning && (
                   <span className="ml-2 text-xs text-amber-600">
@@ -261,13 +261,13 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
                   value={settings[slider.key]}
                   onChange={(e) => handleSliderChange(slider.key, parseInt(e.target.value))}
                   disabled={!canModifyTone}
-                  className="w-full h-2.5 sm:h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full h-2 sm:h-2.5 lg:h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider disabled:cursor-not-allowed disabled:opacity-50"
                   style={{
                     background: `linear-gradient(to right, transparent 0%, transparent ${settings[slider.key]}%, rgba(229,231,235,1) ${settings[slider.key]}%, rgba(229,231,235,1) 100%)`
                   }}
                 />
                 <div 
-                  className={`absolute top-0 left-0 h-2.5 sm:h-3 bg-gradient-to-r ${slider.color} rounded-lg pointer-events-none transition-all duration-300 ${!canModifyTone ? 'opacity-50' : ''}`}
+                  className={`absolute top-0 left-0 h-2 sm:h-2.5 lg:h-3 bg-gradient-to-r ${slider.color} rounded-lg pointer-events-none transition-all duration-300 ${!canModifyTone ? 'opacity-50' : ''}`}
                   style={{ width: `${settings[slider.key]}%` }}
                 />
               </div>
@@ -276,7 +276,7 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
         ))}
       </div>
 
-      <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="mt-4 sm:mt-6 lg:mt-8 pt-3 sm:pt-4 lg:pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <button
           onClick={resetToDefaults}
           disabled={!canModifyTone}

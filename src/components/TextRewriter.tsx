@@ -196,18 +196,18 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 mb-8 sm:mb-10">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8 lg:mb-10">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors hover:bg-gray-100 rounded-lg sm:rounded-xl text-sm sm:text-base"
+          className="inline-flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors hover:bg-gray-100 rounded-lg sm:rounded-xl text-sm sm:text-base order-1 lg:order-none"
         >
           <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           Back to Samples
         </button>
         
-        <div className="text-center flex-1">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-1 sm:mb-2">
+        <div className="text-center flex-1 order-2 lg:order-none">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold bg-gradient-to-r from-gray-800 via-gray-700 to-gray-600 bg-clip-text text-transparent mb-1 sm:mb-2 leading-tight">
             Style Rewriter
           </h1>
           <p className="text-gray-600 text-sm sm:text-base lg:text-lg">
@@ -226,11 +226,11 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 order-3 lg:order-none w-full sm:w-auto">
           {user && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-white/80 rounded-lg border border-gray-200">
+            <div className="flex items-center gap-2 px-3 py-2 bg-white/80 rounded-lg border border-gray-200 text-sm">
               <Zap className="w-4 h-4 text-amber-500" />
-              <span className="text-gray-800 text-sm font-medium">{user.credits_remaining}</span>
+              <span className="text-gray-800 font-medium">{user.credits_remaining}</span>
               {user.subscription_tier === 'free' && (
                 <span className="text-xs text-gray-500">
                   ({user.daily_credits_used}/3 today)
@@ -245,10 +245,11 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           )}
           <button
             onClick={() => setShowToneControls(!showToneControls)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-white/80 hover:bg-white/90 text-gray-700 rounded-lg sm:rounded-xl transition-all backdrop-blur-sm border border-gray-200 text-sm sm:text-base"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 bg-white/80 hover:bg-white/90 text-gray-700 rounded-lg sm:rounded-xl transition-all backdrop-blur-sm border border-gray-200 text-sm sm:text-base"
           >
             <Sliders className="w-4 h-4" />
-            Tone Controls
+            <span className="hidden sm:inline">Tone Controls</span>
+            <span className="sm:hidden">Controls</span>
             {limits.canUsePresets && (
               <Crown className="w-3 h-3 text-amber-500" />
             )}
@@ -261,12 +262,12 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
 
       {/* Security Error Alert */}
       {securityError && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
             <div>
-              <p className="text-red-700 font-medium">Access Restricted</p>
-              <p className="text-red-600 text-sm">{securityError}</p>
+              <p className="text-red-700 font-medium text-sm sm:text-base">Access Restricted</p>
+              <p className="text-red-600 text-xs sm:text-sm">{securityError}</p>
             </div>
           </div>
         </div>
@@ -274,14 +275,14 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
 
       {/* Credits Warning */}
       {user && (
-        <div className="mb-6 sm:mb-8 space-y-4">
+        <div className="mb-4 sm:mb-6 lg:mb-8 space-y-3 sm:space-y-4">
           {user.credits_remaining === 0 && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
                 <div>
-                  <p className="text-red-700 font-medium">No credits remaining</p>
-                  <p className="text-red-600 text-sm">
+                  <p className="text-red-700 font-medium text-sm sm:text-base">No credits remaining</p>
+                  <p className="text-red-600 text-xs sm:text-sm">
                     {user.subscription_tier === 'free' 
                       ? `Your daily credits will reset in ${getTimeUntilReset()} hours at midnight UTC.`
                       : 'Your monthly credits will reset on your signup anniversary.'
@@ -293,12 +294,12 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           )}
           
           {user.subscription_tier === 'free' && user.daily_credits_used >= 3 && user.credits_remaining > 0 && (
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 flex-shrink-0" />
                 <div>
-                  <p className="text-amber-800 font-medium">Daily limit reached</p>
-                  <p className="text-amber-700 text-sm">
+                  <p className="text-amber-800 font-medium text-sm sm:text-base">Daily limit reached</p>
+                  <p className="text-amber-700 text-xs sm:text-sm">
                     You've used your 3 daily credits. Reset in {getTimeUntilReset()} hours.
                   </p>
                 </div>
@@ -307,14 +308,14 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           )}
 
           {user.monthly_credits_used >= limits.monthlyLimit - 10 && user.monthly_credits_used < limits.monthlyLimit && (
-            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">
+            <div className="p-3 sm:p-4 bg-orange-50 border border-orange-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-orange-600 flex-shrink-0" />
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 flex-shrink-0" />
                 <div>
-                  <p className="text-orange-800 font-medium">
+                  <p className="text-orange-800 font-medium text-sm sm:text-base">
                     {limits.monthlyLimit - user.monthly_credits_used} credits left this month
                   </p>
-                  <p className="text-orange-700 text-sm">
+                  <p className="text-orange-700 text-xs sm:text-sm">
                     Monthly limit resets on day {user.monthly_reset_date} of each month.
                   </p>
                 </div>
@@ -323,12 +324,12 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           )}
 
           {user.monthly_credits_used >= limits.monthlyLimit && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 flex-shrink-0" />
                 <div>
-                  <p className="text-red-700 font-medium">Monthly limit reached</p>
-                  <p className="text-red-600 text-sm">
+                  <p className="text-red-700 font-medium text-sm sm:text-base">Monthly limit reached</p>
+                  <p className="text-red-600 text-xs sm:text-sm">
                     You've used all {limits.monthlyLimit} monthly credits. Limit resets on day {user.monthly_reset_date}.
                   </p>
                 </div>
@@ -338,14 +339,14 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
 
           {/* Export limit warning */}
           {user.subscription_tier !== 'premium' && (user.monthly_exports_used || 0) >= limits.exportLimit - 2 && (
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+            <div className="p-3 sm:p-4 bg-purple-50 border border-purple-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <Download className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                <Download className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 flex-shrink-0" />
                 <div>
-                  <p className="text-purple-800 font-medium">
+                  <p className="text-purple-800 font-medium text-sm sm:text-base">
                     {limits.exportLimit - (user.monthly_exports_used || 0)} exports left this month
                   </p>
-                  <p className="text-purple-700 text-sm">
+                  <p className="text-purple-700 text-xs sm:text-sm">
                     {user.subscription_tier === 'free' 
                       ? 'Free users can export up to 5 results per month. Upgrade for more exports.'
                       : 'Pro users can export up to 200 results per month. Upgrade to Premium for unlimited exports.'
@@ -360,7 +361,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
 
       {/* Tone Controls */}
       {showToneControls && (
-        <div className="mb-6 sm:mb-8">
+        <div className="mb-4 sm:mb-6 lg:mb-8">
           <ToneControls
             settings={toneSettings}
             onChange={handleToneSettingsChange}
@@ -371,12 +372,12 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
       )}
 
       {/* Input Section */}
-      <div className="bg-white/80 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-lg mb-6 sm:mb-8">
+      <div className="bg-white/80 backdrop-blur-xl rounded-lg sm:rounded-xl lg:rounded-2xl border border-gray-200 p-4 sm:p-6 lg:p-8 shadow-lg mb-4 sm:mb-6 lg:mb-8">
         <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg sm:rounded-xl flex items-center justify-center">
-            <Send className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          <div className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-md sm:rounded-lg lg:rounded-xl flex items-center justify-center">
+            <Send className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-800">Input Text</h3>
+          <h3 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-800">Input Text</h3>
           {limits.hasPriorityProcessing && (
             <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 rounded-full">
               <Crown className="w-3 h-3 text-blue-600" />
@@ -391,11 +392,11 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder="Paste the text you want to rewrite in your style..."
-          rows={5}
-          className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base"
+          rows={4}
+          className="w-full px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 rounded-md sm:rounded-lg lg:rounded-xl bg-white border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all resize-none backdrop-blur-sm text-sm sm:text-base"
         />
         
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-6 mt-4 sm:mt-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-6 mt-3 sm:mt-4 lg:mt-6">
           <span className="text-sm text-gray-500">
             {inputText.split(' ').filter(w => w.trim()).length} words
           </span>
@@ -404,36 +405,41 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
               <button
                 onClick={handleRewrite}
                 disabled={isRewriting || !canRewrite}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-gray-50 text-gray-600 rounded-lg sm:rounded-xl transition-colors border border-gray-200 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white hover:bg-gray-50 text-gray-600 rounded-md sm:rounded-lg lg:rounded-xl transition-colors border border-gray-200 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RefreshCw className="w-4 h-4" />
-                Rewrite Again
+                <span className="hidden sm:inline">Rewrite Again</span>
+                <span className="sm:hidden">Again</span>
               </button>
             )}
             <button
               onClick={handleRewrite}
               disabled={!canRewrite || isRewriting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 lg:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-md sm:rounded-lg lg:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
             >
               {isRewriting ? (
                 <>
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                  {limits.hasPriorityProcessing ? 
-                    (user?.subscription_tier === 'premium' ? 'Processing (Fastest)...' : 'Processing (Priority)...') : 
-                    'Rewriting...'
-                  }
+                  <span className="hidden sm:inline">
+                    {limits.hasPriorityProcessing ? 
+                      (user?.subscription_tier === 'premium' ? 'Processing (Fastest)...' : 'Processing (Priority)...') : 
+                      'Rewriting...'
+                    }
+                  </span>
+                  <span className="sm:hidden">Processing...</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Rewrite Text
+                  <span className="hidden sm:inline">Rewrite Text</span>
+                  <span className="sm:hidden">Rewrite</span>
                   {user && user.subscription_tier === 'free' && (
-                    <span className="text-xs opacity-75">
+                    <span className="text-xs opacity-75 hidden lg:inline">
                       ({user.credits_remaining} left today)
                     </span>
                   )}
                   {user && user.subscription_tier !== 'free' && (
-                    <span className="text-xs opacity-75">
+                    <span className="text-xs opacity-75 hidden lg:inline">
                       ({limits.monthlyLimit - user.monthly_credits_used} left)
                     </span>
                   )}
@@ -446,37 +452,39 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
 
       {/* Results Section */}
       {result && (
-        <div className="space-y-6 sm:space-y-8">
+        <div className="space-y-4 sm:space-y-6 lg:space-y-8">
           <ComparisonView result={result} />
           
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <button
               onClick={() => handleCopy(result.rewritten)}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-emerald-600 hover:to-teal-600 transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/25 text-sm sm:text-base"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-2.5 lg:py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-md sm:rounded-lg lg:rounded-xl font-medium hover:from-emerald-600 hover:to-teal-600 transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/25 text-sm sm:text-base"
             >
               <Copy className="w-4 h-4" />
-              Copy Rewritten
+              <span className="hidden sm:inline">Copy Rewritten</span>
+              <span className="sm:hidden">Copy</span>
             </button>
             <button
               onClick={handleExport}
               disabled={!canExport}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg sm:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-2.5 lg:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-md sm:rounded-lg lg:rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
             >
               <Download className="w-4 h-4" />
-              Export Results
+              <span className="hidden sm:inline">Export Results</span>
+              <span className="sm:hidden">Export</span>
               {user && user.subscription_tier === 'free' && (
-                <span className="text-xs opacity-75">
+                <span className="text-xs opacity-75 hidden lg:inline">
                   ({5 - (user.monthly_exports_used || 0)} left)
                 </span>
               )}
               {user && user.subscription_tier === 'pro' && (
-                <span className="text-xs opacity-75">
+                <span className="text-xs opacity-75 hidden lg:inline">
                   ({200 - (user.monthly_exports_used || 0)} left)
                 </span>
               )}
               {user && user.subscription_tier === 'premium' && (
-                <span className="text-xs opacity-75">
+                <span className="text-xs opacity-75 hidden lg:inline">
                   (Unlimited)
                 </span>
               )}
