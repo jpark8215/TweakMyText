@@ -11,12 +11,13 @@
 8. [API Integration](#api-integration)
 9. [Component Structure](#component-structure)
 10. [State Management](#state-management)
-11. [Deployment](#deployment)
-12. [Development Setup](#development-setup)
-13. [Testing](#testing)
-14. [Performance Considerations](#performance-considerations)
-15. [Security](#security)
-16. [Troubleshooting](#troubleshooting)
+11. [Responsive Design](#responsive-design)
+12. [Deployment](#deployment)
+13. [Development Setup](#development-setup)
+14. [Testing](#testing)
+15. [Performance Considerations](#performance-considerations)
+16. [Security](#security)
+17. [Troubleshooting](#troubleshooting)
 
 ## Project Overview
 
@@ -31,16 +32,18 @@ TweakMyText is an AI-powered writing style rewriter application that analyzes us
 - **Export Functionality**: Export results in multiple formats with subscription-based limits
 - **Rewrite History**: Track and access previous rewrites with security audit trails
 - **Security Audit System**: Comprehensive logging and monitoring of user actions and subscription access
+- **Responsive Design**: Fully responsive interface optimized for mobile, tablet, and desktop
+- **Session Management**: Proper sign-out handling with state cleanup
 
 ### Technology Stack
 - **Frontend**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS with responsive design system
 - **Icons**: Lucide React
 - **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
+- **Authentication**: Supabase Auth with security logging
 - **AI Integration**: Claude API (with fallback mock implementation)
-- **Deployment**: Netlify
-- **Security**: Row Level Security (RLS) + Audit Logging
+- **Deployment**: Netlify (Production: https://magenta-profiterole-cbb39d.netlify.app)
+- **Security**: Row Level Security (RLS) + Comprehensive Audit Logging
 
 ## Architecture
 
@@ -49,8 +52,8 @@ TweakMyText is an AI-powered writing style rewriter application that analyzes us
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   React Client  │────│   Supabase      │────│   Claude API    │
 │   (Frontend)    │    │   (Backend)     │    │   (AI Service)  │
-│                 │    │   + Security    │    │                 │
-│                 │    │   + Audit Log   │    │                 │
+│   + Responsive  │    │   + Security    │    │                 │
+│   + Session Mgmt│    │   + Audit Log   │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -61,23 +64,26 @@ App
 ├── SettingsModal
 ├── PricingModal
 ├── UserMenu
-├── StyleCapture
+├── StyleCapture (Responsive)
 │   └── WritingSample Management (with subscription limits)
-├── TextRewriter
-│   ├── ToneControls (subscription-gated)
-│   └── ComparisonView
+├── TextRewriter (Responsive)
+│   ├── ToneControls (subscription-gated, responsive)
+│   └── ComparisonView (responsive)
 ├── SubscriptionManagement
-└── Security Layer (validation & logging)
+├── Security Layer (validation & logging)
+└── Session Management (sign-out handling)
 ```
 
-### Data Flow with Security
+### Data Flow with Security & Session Management
 1. User authenticates via Supabase Auth (logged)
-2. Writing samples stored in `writing_samples` table (with subscription limits)
-3. Style analysis performed on samples (subscription-level dependent)
-4. Text rewriting via Claude API or mock service (with priority processing)
-5. Results stored in `rewrite_history` table (with audit trail)
-6. Credit/export tracking in `users` table (with security validation)
-7. All actions logged in `security_audit_log` table
+2. Session state managed with proper cleanup on sign-out
+3. Writing samples stored in `writing_samples` table (with subscription limits)
+4. Style analysis performed on samples (subscription-level dependent)
+5. Text rewriting via Claude API or mock service (with priority processing)
+6. Results stored in `rewrite_history` table (with audit trail)
+7. Credit/export tracking in `users` table (with security validation)
+8. All actions logged in `security_audit_log` table
+9. Proper state cleanup and redirect on sign-out
 
 ## Database Schema
 
@@ -131,7 +137,7 @@ CREATE TABLE rewrite_history (
 );
 ```
 
-#### `security_audit_log` Table (NEW)
+#### `security_audit_log` Table
 Comprehensive security and access logging.
 
 ```sql
@@ -145,6 +151,23 @@ CREATE TABLE security_audit_log (
   ip_address text,
   user_agent text,
   error_message text,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+#### `billing_history` Table
+Billing and payment tracking.
+
+```sql
+CREATE TABLE billing_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount numeric(10,2) NOT NULL CHECK (amount >= 0),
+  currency text DEFAULT 'USD' NOT NULL,
+  status text NOT NULL CHECK (status IN ('paid', 'pending', 'failed', 'refunded')),
+  description text NOT NULL,
+  subscription_tier text NOT NULL CHECK (subscription_tier IN ('free', 'pro', 'premium')),
+  stripe_payment_id text,
   created_at timestamptz DEFAULT now()
 );
 ```
@@ -163,23 +186,25 @@ Resets daily credits for free tier users at midnight UTC.
 #### `reset_monthly_credits()`
 Resets monthly credits and exports on user's signup anniversary.
 
-#### `log_security_event()` (NEW)
+#### `log_security_event()` 
 Logs security events and access attempts to the audit table.
 
-#### `validate_subscription_access()` (NEW)
+#### `validate_subscription_access()` 
 Validates user subscription tier against required access level and logs attempts.
 
-#### `check_tone_control_access()` (NEW)
+#### `check_tone_control_access()` 
 Specifically validates tone control access and logs security events.
 
 ## Authentication & Authorization
 
-### Supabase Auth Integration
+### Supabase Auth Integration with Session Management
 - Email/password authentication
 - No email confirmation required
 - Automatic user profile creation on signup
 - JWT-based session management
-- **NEW**: Comprehensive security event logging for all auth actions
+- **Enhanced**: Comprehensive security event logging for all auth actions
+- **Enhanced**: Proper session cleanup on sign-out
+- **Enhanced**: State management with sign-out detection
 
 ### User Profile Management
 ```typescript
@@ -198,13 +223,15 @@ interface User {
 }
 ```
 
-### Authentication Hook with Security Logging
+### Authentication Hook with Security Logging & Session Management
 The `useAuth` hook provides:
-- User state management
-- Sign in/up/out functions (with security logging)
+- User state management with proper cleanup
+- Sign in/up/out functions (with security logging and state cleanup)
 - Credit management (with audit trails)
 - Export tracking (with access validation)
-- **NEW**: Automatic security event logging for all user actions
+- **Enhanced**: Automatic security event logging for all user actions
+- **Enhanced**: Proper session state cleanup on sign-out
+- **Enhanced**: Sign-out state detection and UI updates
 
 ## Subscription System
 
@@ -222,14 +249,14 @@ The `useAuth` hook provides:
 | History Access | No | Yes | Yes |
 | Support | Community | Email | Priority |
 
-### **NEW**: Subscription Security & Validation
+### **Enhanced**: Subscription Security & Validation
 
 #### Subscription Limits Implementation
 ```typescript
 interface SubscriptionLimits {
-  canModifyTone: boolean;           // NEW: Tone modification access
-  canUsePresets: boolean;           // NEW: Basic preset access
-  canUseAdvancedPresets: boolean;   // NEW: Advanced preset access
+  canModifyTone: boolean;           // Tone modification access
+  canUsePresets: boolean;           // Basic preset access
+  canUseAdvancedPresets: boolean;   // Advanced preset access
   hasAdvancedAnalysis: boolean;
   hasExtendedAnalysis: boolean;
   hasPriorityProcessing: boolean;
@@ -265,7 +292,7 @@ validateToneSettings(user: User | null, toneSettings: ToneSettings): void
 - **Pro Tier**: 200 credits/month, no daily limit (with security validation)
 - **Premium Tier**: 300 credits/month, no daily limit (with audit logging)
 
-### **NEW**: Security-Enhanced Credit Tracking
+### **Enhanced**: Security-Enhanced Credit Tracking
 ```typescript
 const updateCredits = async (creditsUsed: number) => {
   // 1. Log credit usage attempt
@@ -291,7 +318,7 @@ const updateCredits = async (creditsUsed: number) => {
 
 ## Security & Audit System
 
-### **NEW**: Comprehensive Security Logging
+### **Enhanced**: Comprehensive Security Logging
 
 #### Security Event Types
 - Authentication events (sign in/out, failures)
@@ -300,6 +327,7 @@ const updateCredits = async (creditsUsed: number) => {
 - Tone control access attempts
 - Subscription bypass attempts
 - Rate limiting violations
+- Session management events
 
 #### Security Logger Implementation
 ```typescript
@@ -342,7 +370,7 @@ await logSubscriptionBypassAttempt(user: User, action: string, requiredTier: str
 
 ## API Integration
 
-### **NEW**: Secure Claude API Integration
+### **Enhanced**: Secure Claude API Integration
 Enhanced Claude API integration with subscription-based features.
 
 ```typescript
@@ -366,7 +394,7 @@ const rewriteWithClaude = async (
 - **Priority (2)**: Pro tier - 2x faster processing
 - **Premium (1)**: Premium tier - 3x faster processing + best model configuration
 
-### **NEW**: Secure Mock Implementation
+### **Enhanced**: Secure Mock Implementation
 Fallback service with subscription-appropriate features and security validation.
 
 ```typescript
@@ -380,24 +408,52 @@ const secureRewriteText = async (
 
 ## Component Structure
 
-### **NEW**: Security-Enhanced Core Components
+### **Enhanced**: Security-Enhanced Core Components
+
+#### `App.tsx`
+**Major Enhancement**: Session management and sign-out handling:
+- **Enhanced**: Sign-out detection with automatic state cleanup
+- **Enhanced**: Redirect to sign-in page when accessing protected views while signed out
+- **Enhanced**: Proper state reset on sign-out (samples, view, modals)
+- **Enhanced**: Responsive design improvements
 
 #### `TextRewriter.tsx`
-Enhanced text rewriting interface with security:
-- Subscription validation before rewriting
-- Security error handling and display
-- Secure tone settings management
-- Audit trail for all rewrite operations
+**Major Enhancement**: Fully responsive text rewriting interface:
+- **Enhanced**: Mobile-first responsive design
+- **Enhanced**: Adaptive button layouts and text sizing
+- **Enhanced**: Touch-friendly controls for mobile devices
+- **Enhanced**: Subscription validation before rewriting
+- **Enhanced**: Security error handling and display
+- **Enhanced**: Secure tone settings management
+- **Enhanced**: Audit trail for all rewrite operations
 
 #### `ToneControls.tsx`
-**MAJOR UPDATE**: Subscription-gated tone control interface:
+**Major Enhancement**: Responsive subscription-gated tone control interface:
+- **Enhanced**: Mobile-optimized slider controls
+- **Enhanced**: Responsive preset grids
+- **Enhanced**: Touch-friendly interaction areas
 - **Free Tier**: View-only controls with upgrade prompts
 - **Pro Tier**: Manual adjustment + basic presets
 - **Premium Tier**: Full customization + advanced presets
-- Real-time subscription validation
-- Security logging for all access attempts
+- **Enhanced**: Real-time subscription validation
+- **Enhanced**: Security logging for all access attempts
 
-#### **NEW**: Security Validation Layer
+#### `StyleCapture.tsx`
+**Major Enhancement**: Responsive writing sample management:
+- **Enhanced**: Mobile-first design with proper spacing
+- **Enhanced**: Responsive typography and icon sizing
+- **Enhanced**: Touch-friendly sample management
+- **Enhanced**: Adaptive form layouts
+- **Enhanced**: Subscription limit warnings with responsive design
+
+#### `ComparisonView.tsx`
+**Major Enhancement**: Responsive comparison interface:
+- **Enhanced**: Mobile-optimized comparison layout
+- **Enhanced**: Responsive arrow indicators (rotated on mobile)
+- **Enhanced**: Adaptive text sizing and spacing
+- **Enhanced**: Touch-friendly interaction areas
+
+#### **Enhanced**: Security Validation Layer
 - `subscriptionValidator.ts`: Centralized subscription validation
 - `securityLogger.ts`: Comprehensive security event logging
 - `secureStyleAnalyzer.ts`: Subscription-aware style analysis
@@ -422,34 +478,109 @@ Enhanced subscription tier comparison:
 - Feature comparison with security implications
 - Upgrade flows
 
+#### `SubscriptionManagement.tsx`
+**Enhanced**: Subscription management with real billing data:
+- **Enhanced**: Integration with Supabase billing_history table
+- **Enhanced**: Real billing data instead of mock data
+- **Enhanced**: Proper pricing modal integration
+- **Enhanced**: Responsive design for all screen sizes
+
 ## State Management
 
-### **NEW**: Security-Aware State Management
+### **Enhanced**: Security-Aware State Management with Session Handling
 - Component-level state using `useState`
-- **NEW**: Security error state management
-- **NEW**: Subscription validation state
+- **Enhanced**: Security error state management
+- **Enhanced**: Subscription validation state
+- **Enhanced**: Session state management with sign-out detection
+- **Enhanced**: Automatic state cleanup on sign-out
 - Form state management with validation
 - UI state (modals, loading, errors, security alerts)
 
-### Global State with Security
-- User authentication via `useAuth` hook (with security logging)
+### Global State with Security & Session Management
+- User authentication via `useAuth` hook (with security logging and session management)
 - Writing samples passed between components (with subscription limits)
-- **NEW**: Subscription limits computed with security validation
-- **NEW**: Security event tracking
+- **Enhanced**: Subscription limits computed with security validation
+- **Enhanced**: Security event tracking
+- **Enhanced**: Session state cleanup on sign-out
 
 ### Data Persistence with Audit Trails
 - Writing samples: Supabase database (with access logging)
 - User preferences: Local storage
-- Session state: Supabase Auth (with security events)
-- **NEW**: Security audit logs: Permanent database storage
+- Session state: Supabase Auth (with security events and cleanup)
+- **Enhanced**: Security audit logs: Permanent database storage
+- **Enhanced**: Billing history: Real Supabase integration
+
+## Responsive Design
+
+### **New Section**: Comprehensive Responsive Design System
+
+#### Design Principles
+- **Mobile-First**: All components designed for mobile, then enhanced for larger screens
+- **Touch-Friendly**: Minimum 44px touch targets for all interactive elements
+- **Readable Typography**: Proper font scaling across all screen sizes
+- **Adaptive Layouts**: Flexible layouts that work on any screen size
+- **Consistent Spacing**: 8px spacing system with responsive scaling
+
+#### Breakpoint Strategy
+```css
+/* Mobile (default) */
+/* Tablet (sm: 640px+) */
+/* Desktop (lg: 1024px+) */
+/* Large Desktop (xl: 1280px+) */
+```
+
+#### Component Responsiveness
+
+##### **StyleCapture Component**
+- **Mobile**: Single-column layout, compact spacing, touch-friendly buttons
+- **Tablet**: Enhanced spacing, larger touch targets
+- **Desktop**: Optimized layouts with better use of screen space
+
+##### **TextRewriter Component**
+- **Mobile**: Stacked header layout, compact controls, hidden text on small buttons
+- **Tablet**: Balanced two-column layouts where appropriate
+- **Desktop**: Full multi-column layouts with enhanced spacing
+
+##### **ToneControls Component**
+- **Mobile**: Stacked preset grids, touch-optimized sliders
+- **Tablet**: Balanced grid layouts
+- **Desktop**: Full grid layouts with optimal spacing
+
+##### **ComparisonView Component**
+- **Mobile**: Vertical layout with rotated arrow indicator
+- **Tablet**: Side-by-side with proper spacing
+- **Desktop**: Enhanced comparison with larger content areas
+
+#### Typography Scaling
+```css
+/* Responsive font sizes */
+text-xs sm:text-sm lg:text-base     /* Body text */
+text-sm sm:text-base lg:text-lg     /* Subheadings */
+text-xl sm:text-2xl lg:text-3xl     /* Main headings */
+```
+
+#### Icon Scaling
+```css
+/* Responsive icon sizes */
+w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5   /* Small icons */
+w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 /* Large icons */
+```
+
+#### Spacing System
+```css
+/* Responsive spacing */
+p-3 sm:p-4 lg:p-6                   /* Padding */
+gap-2 sm:gap-3 lg:gap-4             /* Gaps */
+mb-4 sm:mb-6 lg:mb-8                /* Margins */
+```
 
 ## Deployment
 
-### **NEW**: Production Deployment Information
+### **Enhanced**: Production Deployment Information
 - **Primary Platform**: Netlify
 - **Live URL**: https://magenta-profiterole-cbb39d.netlify.app
 - **Build Process**: Automated via Netlify
-- **Environment**: Production-ready with security features
+- **Environment**: Production-ready with security features and responsive design
 
 ### Environment Variables
 ```bash
@@ -471,12 +602,13 @@ npm run build
 - **Vercel**: Alternative platform
 - **Static hosting**: Any static file server
 
-### **NEW**: Security Considerations for Production
+### **Enhanced**: Security Considerations for Production
 - Environment variables properly configured
 - Security audit logging enabled
 - Rate limiting active
 - Subscription validation enforced
 - All security policies enabled
+- Responsive design optimized for all devices
 
 ## Development Setup
 
@@ -503,7 +635,7 @@ cp .env.example .env
 npm run dev
 ```
 
-### **NEW**: Database Setup with Security
+### **Enhanced**: Database Setup with Security
 1. Create Supabase project
 2. Run migrations in order:
    - `20250610021118_lucky_trail.sql` (users table)
@@ -514,7 +646,8 @@ npm run dev
    - `20250616002520_pink_cottage.sql` (export tracking)
    - `20250616003152_bitter_mouse.sql` (Pro tier updates)
    - `20250616012605_lucky_sky.sql` (Premium tier updates)
-   - **NEW**: `20250617015502_snowy_palace.sql` (security audit system)
+   - `20250617015502_snowy_palace.sql` (security audit system)
+   - `20250618005630_heavy_disk.sql` (billing history)
 
 ### Development Commands
 ```bash
@@ -526,14 +659,16 @@ npm run lint         # Run ESLint
 
 ## Testing
 
-### **NEW**: Security Testing Strategy
+### **Enhanced**: Security Testing Strategy
 - Component testing with React Testing Library
-- **NEW**: Subscription validation testing
-- **NEW**: Security event logging testing
+- **Enhanced**: Subscription validation testing
+- **Enhanced**: Security event logging testing
+- **Enhanced**: Responsive design testing
+- **Enhanced**: Session management testing
 - Integration testing for user flows with security
 - Database testing with Supabase local development
 - API testing with mock services
-- **NEW**: Security audit log verification
+- **Enhanced**: Security audit log verification
 
 ### Test Structure
 ```
@@ -542,72 +677,86 @@ src/
 │   ├── components/
 │   ├── hooks/
 │   ├── utils/
-│   ├── security/          # NEW: Security testing
+│   ├── security/          # Security testing
+│   ├── responsive/        # Responsive design testing
 │   └── integration/
 ```
 
-### **NEW**: Security Test Cases
+### **Enhanced**: Security Test Cases
 - Subscription tier validation
 - Tone control access restrictions
 - Credit limit enforcement
 - Export limit validation
 - Security event logging
 - Rate limiting functionality
+- Session management and cleanup
+
+### **New**: Responsive Design Test Cases
+- Mobile layout validation
+- Touch target size verification
+- Typography scaling tests
+- Breakpoint behavior validation
+- Cross-device compatibility
 
 ## Performance Considerations
 
-### **NEW**: Security-Aware Optimization Strategies
+### **Enhanced**: Security-Aware Optimization Strategies
 - **Code Splitting**: Dynamic imports for large components
 - **Lazy Loading**: Defer non-critical component loading
 - **Memoization**: React.memo for expensive components (with security context)
 - **Database Indexing**: Optimized queries with proper indexes (including security logs)
-- **NEW**: Subscription validation caching
-- **NEW**: Security event batching for performance
+- **Enhanced**: Subscription validation caching
+- **Enhanced**: Security event batching for performance
+- **Enhanced**: Responsive image optimization
 
 ### Performance Monitoring with Security
 - Bundle size analysis
 - Core Web Vitals tracking
 - Database query performance (including audit queries)
 - API response times (with priority processing)
-- **NEW**: Security event processing performance
+- **Enhanced**: Security event processing performance
+- **Enhanced**: Responsive design performance metrics
 
-### **NEW**: Security-Aware Caching Strategy
+### **Enhanced**: Security-Aware Caching Strategy
 - Browser caching for static assets
 - Service worker for offline functionality
 - Database query caching (with security context)
 - API response caching (subscription-aware)
-- **NEW**: Subscription validation result caching
+- **Enhanced**: Subscription validation result caching
+- **Enhanced**: Responsive asset caching
 
 ## Security
 
-### **NEW**: Enhanced Security Measures
+### **Enhanced**: Enhanced Security Measures
 - **Row Level Security**: Database-level access control
 - **Input Validation**: Client and server-side validation
 - **SQL Injection Prevention**: Parameterized queries
 - **XSS Prevention**: Content sanitization
 - **CSRF Protection**: Token-based protection
-- **NEW**: Comprehensive audit logging
-- **NEW**: Subscription-based access control
-- **NEW**: Rate limiting and abuse prevention
-- **NEW**: Security event monitoring
+- **Enhanced**: Comprehensive audit logging
+- **Enhanced**: Subscription-based access control
+- **Enhanced**: Rate limiting and abuse prevention
+- **Enhanced**: Security event monitoring
+- **Enhanced**: Session security with proper cleanup
 
-### **NEW**: Data Protection with Audit Trails
+### **Enhanced**: Data Protection with Audit Trails
 - **Encryption**: Data encrypted at rest and in transit
 - **Access Control**: Role-based permissions with logging
 - **Audit Logging**: User action tracking with security events
 - **Data Retention**: Configurable retention policies
-- **NEW**: Security incident detection
-- **NEW**: Subscription bypass prevention
+- **Enhanced**: Security incident detection
+- **Enhanced**: Subscription bypass prevention
+- **Enhanced**: Session data protection
 
-### **NEW**: API Security with Subscription Validation
+### **Enhanced**: API Security with Subscription Validation
 - **Rate Limiting**: Prevent API abuse (with logging)
 - **Authentication**: JWT-based auth (with security events)
 - **Authorization**: Role-based access (with subscription validation)
 - **Input Sanitization**: Prevent injection attacks
-- **NEW**: Subscription tier enforcement
-- **NEW**: Security event correlation
+- **Enhanced**: Subscription tier enforcement
+- **Enhanced**: Security event correlation
 
-### **NEW**: Subscription Security Model
+### **Enhanced**: Subscription Security Model
 ```typescript
 // Security validation flow
 1. User attempts action
@@ -616,11 +765,12 @@ src/
 4. Allow/deny with audit trail
 5. Monitor for bypass attempts
 6. Rate limit suspicious activity
+7. Handle session security
 ```
 
 ## Troubleshooting
 
-### **NEW**: Security-Related Issues
+### **Enhanced**: Security-Related Issues
 
 #### Subscription Access Problems
 ```typescript
@@ -655,6 +805,33 @@ const toneEvents = await supabase
   .eq('user_id', user.id);
 ```
 
+#### **New**: Session Management Issues
+```typescript
+// Debug session state
+const { data: { session } } = await supabase.auth.getSession();
+console.log('Current session:', session);
+
+// Check for proper state cleanup
+console.log('User state after sign-out:', user);
+console.log('Current view after sign-out:', currentView);
+```
+
+#### **New**: Responsive Design Issues
+```css
+/* Debug responsive breakpoints */
+@media (max-width: 640px) {
+  /* Mobile styles */
+}
+
+@media (min-width: 640px) and (max-width: 1024px) {
+  /* Tablet styles */
+}
+
+@media (min-width: 1024px) {
+  /* Desktop styles */
+}
+```
+
 ### Common Issues
 
 #### Authentication Problems
@@ -685,9 +862,12 @@ SELECT auth.uid(), auth.role();
 
 -- Check security audit log access
 SELECT * FROM security_audit_log WHERE user_id = auth.uid() LIMIT 5;
+
+-- Check billing history access
+SELECT * FROM billing_history WHERE user_id = auth.uid() LIMIT 5;
 ```
 
-#### **NEW**: Credit System Issues with Security
+#### **Enhanced**: Credit System Issues with Security
 ```typescript
 // Debug credit calculations with security context
 console.log('User credits:', user.credits_remaining);
@@ -704,7 +884,7 @@ const creditEvents = await supabase
   .order('created_at', { ascending: false });
 ```
 
-#### **NEW**: API Integration Issues with Security
+#### **Enhanced**: API Integration Issues with Security
 ```typescript
 // Test Claude API connection with subscription context
 const testSecureClaudeAPI = async () => {
@@ -730,53 +910,75 @@ const testSecureClaudeAPI = async () => {
 };
 ```
 
-### **NEW**: Debug Mode with Security
+#### **New**: Responsive Design Issues
+```typescript
+// Debug responsive behavior
+const checkResponsive = () => {
+  console.log('Window width:', window.innerWidth);
+  console.log('Mobile breakpoint:', window.innerWidth < 640);
+  console.log('Tablet breakpoint:', window.innerWidth >= 640 && window.innerWidth < 1024);
+  console.log('Desktop breakpoint:', window.innerWidth >= 1024);
+};
+
+// Check touch device
+console.log('Touch device:', 'ontouchstart' in window);
+```
+
+### **Enhanced**: Debug Mode with Security
 Enable debug logging by setting:
 ```bash
 VITE_DEBUG=true
 ```
 
-### **NEW**: Security Monitoring
+### **Enhanced**: Security Monitoring
 - Real-time security event tracking
 - Subscription bypass attempt detection
 - Rate limiting violation monitoring
 - Audit log analysis tools
+- Session security monitoring
 
 ## Contributing
 
 ### Development Workflow
 1. Create feature branch
 2. Implement changes with security considerations
-3. Add tests (including security tests)
+3. Add tests (including security and responsive tests)
 4. Update documentation
-5. **NEW**: Verify security audit logging
-6. Submit pull request
+5. **Enhanced**: Verify security audit logging
+6. **Enhanced**: Test responsive design across devices
+7. **Enhanced**: Verify session management
+8. Submit pull request
 
-### **NEW**: Security Code Standards
+### **Enhanced**: Security Code Standards
 - TypeScript strict mode
 - ESLint configuration
 - Prettier formatting
 - Conventional commits
-- **NEW**: Security validation for all subscription-gated features
-- **NEW**: Comprehensive audit logging for user actions
-- **NEW**: Input validation and sanitization
+- **Enhanced**: Security validation for all subscription-gated features
+- **Enhanced**: Comprehensive audit logging for user actions
+- **Enhanced**: Input validation and sanitization
+- **Enhanced**: Responsive design standards
 
-### **NEW**: Security Review Process
+### **Enhanced**: Security Review Process
 - Code review required (including security review)
-- Test coverage maintained (including security tests)
+- Test coverage maintained (including security and responsive tests)
 - Documentation updated (including security implications)
 - Performance impact assessed (including security overhead)
-- **NEW**: Security audit log verification
-- **NEW**: Subscription validation testing
+- **Enhanced**: Security audit log verification
+- **Enhanced**: Subscription validation testing
+- **Enhanced**: Responsive design validation
+- **Enhanced**: Session management testing
 
 ---
 
 ## Appendix
 
-### **NEW**: Security Event Types
+### **Enhanced**: Security Event Types
 - `user_sign_in` / `user_sign_out` / `sign_in_failed` / `sign_up_failed`
+- `user_sign_out_attempt` / `user_profile_created` / `user_profile_fetch_error`
 - `credit_usage_attempt` / `credit_limit_exceeded` / `credits_used`
-- `export_attempt` / `export_limit_exceeded` / `export_successful`
+- `daily_credit_limit_exceeded` / `monthly_credit_limit_exceeded`
+- `export_attempt` / `export_limit_exceeded` / `export_successful` / `export_unlimited`
 - `tone_control_access` / `subscription_bypass_attempt`
 - `rate_limit_violation`
 
@@ -786,42 +988,58 @@ VITE_DEBUG=true
 - **v3**: Export tracking
 - **v4**: Subscription tier updates
 - **v5**: Premium tier features
-- **NEW v6**: Security audit system and subscription validation
+- **v6**: Security audit system and subscription validation
+- **v7**: Billing history integration
 
-### **NEW**: Security Architecture
-- **Frontend**: Subscription validation + security error handling
-- **Backend**: Database functions + audit logging + RLS policies
+### **Enhanced**: Security Architecture
+- **Frontend**: Subscription validation + security error handling + session management
+- **Backend**: Database functions + audit logging + RLS policies + billing integration
 - **API**: Secure Claude integration + subscription-aware processing
 
+### **Enhanced**: Responsive Design Architecture
+- **Mobile-First**: All components start with mobile design
+- **Progressive Enhancement**: Features added for larger screens
+- **Touch-Optimized**: All interactions work on touch devices
+- **Flexible Layouts**: Components adapt to any screen size
+
 ### API Endpoints
-- **Supabase**: Database operations, authentication, security logging
+- **Supabase**: Database operations, authentication, security logging, billing
 - **Claude API**: Text rewriting service (subscription-aware)
 - **Netlify**: Deployment and hosting
 
 ### External Dependencies
 - **@supabase/supabase-js**: Database client
 - **lucide-react**: Icon library
-- **tailwindcss**: Styling framework
+- **tailwindcss**: Styling framework with responsive utilities
 - **react**: UI framework
 - **typescript**: Type safety
 
-### **NEW**: Security Dependencies
+### **Enhanced**: Security Dependencies
 - Custom subscription validation system
 - Security audit logging framework
 - Rate limiting implementation
 - Access control matrix
+- Session management system
 
 ### Performance Benchmarks
 - **Initial Load**: < 2s
 - **Text Rewrite**: < 5s (standard), < 2.5s (priority), < 1.7s (premium)
 - **Database Query**: < 500ms
 - **Bundle Size**: < 1MB
-- **NEW**: Security Event Logging: < 100ms overhead
+- **Enhanced**: Security Event Logging: < 100ms overhead
+- **Enhanced**: Responsive Layout Shift: < 0.1 CLS
 
-### **NEW**: Security Metrics
+### **Enhanced**: Security Metrics
 - **Subscription Validation**: < 50ms
 - **Audit Log Write**: < 100ms
 - **Rate Limit Check**: < 10ms
 - **Access Control Validation**: < 25ms
+- **Session Validation**: < 30ms
 
-This documentation provides a comprehensive overview of the TweakMyText application architecture, implementation details, security features, and operational procedures for developers working on the project.
+### **New**: Responsive Design Metrics
+- **Mobile Performance**: 90+ Lighthouse score
+- **Touch Target Size**: Minimum 44px
+- **Font Readability**: 16px minimum on mobile
+- **Layout Shift**: < 0.1 CLS across all breakpoints
+
+This documentation provides a comprehensive overview of the TweakMyText application architecture, implementation details, security features, responsive design system, session management, and operational procedures for developers working on the project.
