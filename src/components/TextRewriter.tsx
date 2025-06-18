@@ -11,9 +11,10 @@ import ComparisonView from './ComparisonView';
 interface TextRewriterProps {
   samples: WritingSample[];
   onBack: () => void;
+  onOpenPricing?: () => void; // Add this prop
 }
 
-export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
+export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRewriterProps) {
   const [inputText, setInputText] = useState('');
   const [result, setResult] = useState<RewriteResult | null>(null);
   const [isRewriting, setIsRewriting] = useState(false);
@@ -364,6 +365,7 @@ export default function TextRewriter({ samples, onBack }: TextRewriterProps) {
             settings={toneSettings}
             onChange={handleToneSettingsChange}
             onClose={() => setShowToneControls(false)}
+            onOpenPricing={onOpenPricing}
           />
         </div>
       )}

@@ -42,6 +42,10 @@ function App() {
     setShowSettingsModal(false);
   };
 
+  const handleOpenPricing = () => {
+    setShowPricingModal(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
@@ -101,7 +105,7 @@ function App() {
                 <UserMenu 
                   onOpenSettings={() => setShowSettingsModal(true)}
                   onManageSubscription={handleManageSubscription}
-                  onOpenPricing={() => setShowPricingModal(true)}
+                  onOpenPricing={handleOpenPricing}
                 />
               ) : (
                 <button
@@ -129,6 +133,7 @@ function App() {
           <TextRewriter
             samples={writingSamples}
             onBack={handleBack}
+            onOpenPricing={handleOpenPricing}
           />
         ) : (
           <SubscriptionManagement

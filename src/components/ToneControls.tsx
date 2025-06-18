@@ -7,9 +7,10 @@ interface ToneControlsProps {
   settings: ToneSettings;
   onChange: (settings: ToneSettings) => void;
   onClose: () => void;
+  onOpenPricing?: () => void; // Add this prop
 }
 
-export default function ToneControls({ settings, onChange, onClose }: ToneControlsProps) {
+export default function ToneControls({ settings, onChange, onClose, onOpenPricing }: ToneControlsProps) {
   const { user } = useAuth();
 
   const handleSliderChange = (key: keyof ToneSettings, value: number) => {
@@ -35,6 +36,10 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
       enthusiasm: 50, 
       technicality: 50 
     });
+  };
+
+  const handleUpgradeClick = () => {
+    onOpenPricing?.();
   };
 
   const hasTonePresets = user && (user.subscription_tier === 'pro' || user.subscription_tier === 'premium');
@@ -159,6 +164,13 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
               Premium: Custom fine-tuning + advanced presets
             </div>
           </div>
+          <button
+            onClick={handleUpgradeClick}
+            className="mt-3 w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm"
+          >
+            <Crown className="w-4 h-4 inline mr-2" />
+            Upgrade to Unlock Tone Controls
+          </button>
         </div>
       )}
 
@@ -274,17 +286,23 @@ export default function ToneControls({ settings, onChange, onClose }: ToneContro
         </button>
         
         {!hasTonePresets && (
-          <div className="text-xs text-gray-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <Crown className="w-3 h-3 text-amber-600 inline mr-1" />
+          <button
+            onClick={handleUpgradeClick}
+            className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-2 transition-all font-medium"
+          >
+            <Crown className="w-3 h-3 inline mr-1" />
             Upgrade to Pro for tone presets
-          </div>
+          </button>
         )}
 
         {hasTonePresets && !hasCustomTuning && (
-          <div className="text-xs text-gray-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <Star className="w-3 h-3 text-amber-600 inline mr-1" />
+          <button
+            onClick={handleUpgradeClick}
+            className="text-xs text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-3 py-2 transition-all font-medium"
+          >
+            <Star className="w-3 h-3 inline mr-1" />
             Upgrade to Premium for custom fine-tuning
-          </div>
+          </button>
         )}
       </div>
     </div>
