@@ -42,7 +42,7 @@ TweakMyText is an AI-powered writing style rewriter application that analyzes us
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth with security logging
 - **AI Integration**: Claude API (with fallback mock implementation)
-- **Deployment**: Netlify (Production: https://magenta-profiterole-cbb39d.netlify.app)
+- **Deployment**: Netlify (Production: https://tweakmytext.netlify.app)
 - **Security**: Row Level Security (RLS) + Comprehensive Audit Logging
 
 ## Architecture
