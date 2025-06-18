@@ -247,7 +247,6 @@ The `useAuth` hook provides:
 | Tone Controls | **View-Only** | **Manual + Presets** | **Custom Fine-Tuning** |
 | Daily Limits | Yes | No | No |
 | History Access | No | Yes | Yes |
-| Support | Community | Email | Priority |
 
 ### **Enhanced**: Subscription Security & Validation
 
