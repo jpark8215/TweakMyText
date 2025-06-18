@@ -58,12 +58,11 @@ export default function SubscriptionManagement({ onBack }: SubscriptionManagemen
           features: [
             '200 rewrites per month',
             'Advanced style analysis',
-            'Priority processing (2x faster)',
             'Save up to 25 writing samples',
-            'Export up to 200 results',
-            'Basic tone presets',
+            'Export results (up to 200 rewrites)',
             'Rewrite history access',
-            'Email support'
+            'Access to basic tone presets',
+            'Priority processing (2x faster)'
           ]
         };
       case 'premium':
