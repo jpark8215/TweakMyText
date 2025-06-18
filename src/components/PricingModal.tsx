@@ -35,7 +35,7 @@ const pricingTiers: PricingTier[] = [
   {
     id: 'pro',
     name: 'Pro',
-    price: 4.99,
+    price: 10,
     credits: 200,
     features: [
       '200 rewrites per month',
@@ -62,7 +62,7 @@ const pricingTiers: PricingTier[] = [
   {
     id: 'premium',
     name: 'Premium',
-    price: 7.99,
+    price: 18,
     credits: 300,
     features: [
       '300 rewrites per month',
