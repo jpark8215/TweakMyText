@@ -6,7 +6,7 @@
 3. [Database Schema](#database-schema)
 4. [Authentication & Authorization](#authentication--authorization)
 5. [Subscription System](#subscription-system)
-6. [Credit System](#credit-system)
+6. [Token System](#token-system)
 7. [Security & Audit System](#security--audit-system)
 8. [API Integration](#api-integration)
 9. [Component Structure](#component-structure)
@@ -28,7 +28,7 @@ TweakMyText is an AI-powered writing style rewriter application that analyzes us
 - **Text Rewriting**: Transform any text to match learned writing style with priority processing
 - **Tone Controls**: Subscription-gated adjustable parameters for formality, casualness, enthusiasm, and technicality
 - **Subscription Tiers**: Free, Pro, and Premium with different feature sets and security controls
-- **Credit System**: Usage-based billing with daily/monthly limits and comprehensive tracking
+- **Token System**: Usage-based billing with daily/monthly limits and comprehensive tracking
 - **Export Functionality**: Export results in multiple formats with subscription-based limits
 - **Rewrite History**: Track and access previous rewrites with security audit trails
 - **Security Audit System**: Comprehensive logging and monitoring of user actions and subscription access
@@ -81,7 +81,7 @@ App
 4. Style analysis performed on samples (subscription-level dependent)
 5. Text rewriting via Claude API or mock service (with priority processing)
 6. Results stored in `rewrite_history` table (with audit trail)
-7. Credit/export tracking in `users` table (with security validation)
+7. Token/export tracking in `users` table (with security validation)
 8. All actions logged in `security_audit_log` table
 9. Proper state cleanup and redirect on sign-out
 
@@ -90,18 +90,18 @@ App
 ### Tables Overview
 
 #### `users` Table
-Primary user information and subscription details.
+Primary user information and subscription details with token-based system.
 
 ```sql
 CREATE TABLE users (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email text UNIQUE NOT NULL,
   subscription_tier text DEFAULT 'free' CHECK (subscription_tier IN ('free', 'pro', 'premium')),
-  credits_remaining integer DEFAULT 3 CHECK (credits_remaining >= 0),
-  daily_credits_used integer DEFAULT 0 CHECK (daily_credits_used >= 0),
-  monthly_credits_used integer DEFAULT 0 CHECK (monthly_credits_used >= 0),
+  tokens_remaining integer DEFAULT 100000 CHECK (tokens_remaining >= 0),
+  daily_tokens_used integer DEFAULT 0 CHECK (daily_tokens_used >= 0),
+  monthly_tokens_used integer DEFAULT 0 CHECK (monthly_tokens_used >= 0),
   monthly_exports_used integer DEFAULT 0 CHECK (monthly_exports_used >= 0),
-  last_credit_reset date DEFAULT CURRENT_DATE,
+  last_token_reset date DEFAULT CURRENT_DATE,
   monthly_reset_date integer DEFAULT EXTRACT(DAY FROM CURRENT_DATE),
   subscription_expires_at timestamptz,
   created_at timestamptz DEFAULT now()
@@ -180,11 +180,11 @@ All tables have RLS enabled with policies ensuring users can only access their o
 
 ### Database Functions
 
-#### `reset_daily_credits()`
-Resets daily credits for free tier users at midnight UTC.
+#### `reset_daily_tokens()`
+Resets daily tokens for free tier users at midnight UTC.
 
-#### `reset_monthly_credits()`
-Resets monthly credits and exports on user's signup anniversary.
+#### `reset_monthly_tokens()`
+Resets monthly tokens and exports on user's signup anniversary.
 
 #### `log_security_event()` 
 Logs security events and access attempts to the audit table.
@@ -212,11 +212,11 @@ interface User {
   id: string;
   email: string;
   subscription_tier: 'free' | 'pro' | 'premium';
-  credits_remaining: number;
-  daily_credits_used: number;
-  monthly_credits_used: number;
+  tokens_remaining: number;
+  daily_tokens_used: number;
+  monthly_tokens_used: number;
   monthly_exports_used: number;
-  last_credit_reset: string;
+  last_token_reset: string;
   monthly_reset_date: number;
   subscription_expires_at?: Date;
   created_at: Date;
@@ -227,7 +227,7 @@ interface User {
 The `useAuth` hook provides:
 - User state management with proper cleanup
 - Sign in/up/out functions (with security logging and state cleanup)
-- Credit management (with audit trails)
+- Token management (with audit trails)
 - Export tracking (with access validation)
 - **Enhanced**: Automatic security event logging for all user actions
 - **Enhanced**: Proper session state cleanup on sign-out
@@ -239,14 +239,15 @@ The `useAuth` hook provides:
 
 | Feature | Free | Pro | Premium |
 |---------|------|-----|---------|
-| Monthly Rewrites | 90 (3/day) | 200 | 300 |
+| Monthly Tokens | 1,000,000 | 5,000,000 | 10,000,000 |
+| Daily Token Limit | 100,000 | No limit | No limit |
 | Writing Samples | 3 | 25 | 100 |
 | Monthly Exports | 5 | 200 | Unlimited |
 | Processing Speed | 1x | 2x | 3x |
 | Style Analysis | Basic | Advanced | Extended |
 | Tone Controls | **View-Only** | **Manual + Presets** | **Custom Fine-Tuning** |
-| Daily Limits | Yes | No | No |
 | History Access | No | Yes | Yes |
+| Pricing | Free | $10/month | $18/month |
 
 ### **Enhanced**: Subscription Security & Validation
 
@@ -261,8 +262,8 @@ interface SubscriptionLimits {
   hasPriorityProcessing: boolean;
   processingPriority: 'standard' | 'priority' | 'premium';
   maxWritingSamples: number;
-  dailyLimit: number;
-  monthlyLimit: number;
+  dailyTokenLimit: number;
+  monthlyTokenLimit: number;
   exportLimit: number;
 }
 ```
@@ -284,36 +285,45 @@ validatePresetAccess(user: User | null, presetName: string): void
 validateToneSettings(user: User | null, toneSettings: ToneSettings): void
 ```
 
-## Credit System
+## Token System
 
-### Credit Management with Security
-- **Free Tier**: 3 credits/day, 90/month max (with daily limit enforcement)
-- **Pro Tier**: 200 credits/month, no daily limit (with security validation)
-- **Premium Tier**: 300 credits/month, no daily limit (with audit logging)
+### Token Management with Security
+- **Free Tier**: 100,000 tokens/day, 1,000,000/month max (with daily limit enforcement)
+- **Pro Tier**: 5,000,000 tokens/month, no daily limit (with security validation)
+- **Premium Tier**: 10,000,000 tokens/month, no daily limit (with audit logging)
 
-### **Enhanced**: Security-Enhanced Credit Tracking
+### **Enhanced**: Security-Enhanced Token Tracking
 ```typescript
-const updateCredits = async (creditsUsed: number) => {
-  // 1. Log credit usage attempt
+const updateTokens = async (tokensUsed: number) => {
+  // 1. Log token usage attempt
   await logSecurityEvent({
     userId: user.id,
-    action: 'credit_usage_attempt',
-    resource: 'credits',
+    action: 'token_usage_attempt',
+    resource: 'tokens',
     allowed: true,
     subscriptionTier: user.subscription_tier,
   });
 
   // 2. Validate subscription limits
   // 3. Check daily/monthly limits with security logging
-  // 4. Update credits with audit trail
+  // 4. Update tokens with audit trail
   // 5. Log successful usage or limit violations
 };
 ```
+
+### Token Usage Estimation
+The system estimates token usage based on text length (approximately 4 characters per token), providing users with real-time feedback on their usage before processing.
 
 ### Reset Logic with Audit Trails
 - **Daily Reset**: Midnight UTC for free users only (logged)
 - **Monthly Reset**: On signup anniversary day (logged)
 - **Automatic Resets**: Handled by database functions with security events
+
+### Token Formatting
+The application uses intelligent token formatting for better user experience:
+- 1,000+ tokens displayed as "1K"
+- 1,000,000+ tokens displayed as "1M"
+- Real-time usage tracking with remaining token display
 
 ## Security & Audit System
 
@@ -321,7 +331,7 @@ const updateCredits = async (creditsUsed: number) => {
 
 #### Security Event Types
 - Authentication events (sign in/out, failures)
-- Credit usage and limit violations
+- Token usage and limit violations
 - Export attempts and restrictions
 - Tone control access attempts
 - Subscription bypass attempts
@@ -417,8 +427,10 @@ const secureRewriteText = async (
 - **Enhanced**: Responsive design improvements
 
 #### `TextRewriter.tsx`
-**Major Enhancement**: Fully responsive text rewriting interface:
+**Major Enhancement**: Fully responsive text rewriting interface with token system:
 - **Enhanced**: Mobile-first responsive design
+- **Enhanced**: Token usage estimation and display
+- **Enhanced**: Real-time token consumption tracking
 - **Enhanced**: Adaptive button layouts and text sizing
 - **Enhanced**: Touch-friendly controls for mobile devices
 - **Enhanced**: Subscription validation before rewriting
@@ -452,8 +464,28 @@ const secureRewriteText = async (
 - **Enhanced**: Adaptive text sizing and spacing
 - **Enhanced**: Touch-friendly interaction areas
 
+#### `UserMenu.tsx`
+**Enhanced**: Token display with formatting:
+- **Enhanced**: Intelligent token formatting (1K, 1M)
+- **Enhanced**: Real-time token remaining display
+- **Enhanced**: Responsive design for all screen sizes
+
+#### `PricingModal.tsx`
+**Enhanced**: Updated pricing with token system:
+- **Enhanced**: Token-based pricing display
+- **Enhanced**: Clear feature differentiation
+- **Enhanced**: Updated pricing ($10 Pro, $18 Premium)
+- **Enhanced**: Token formatting throughout
+
+#### `SubscriptionManagement.tsx`
+**Enhanced**: Token-based subscription management:
+- **Enhanced**: Token usage statistics and progress bars
+- **Enhanced**: Real billing data integration
+- **Enhanced**: Token formatting and display
+- **Enhanced**: Responsive design for all screen sizes
+
 #### **Enhanced**: Security Validation Layer
-- `subscriptionValidator.ts`: Centralized subscription validation
+- `subscriptionValidator.ts`: Centralized subscription validation with token limits
 - `securityLogger.ts`: Comprehensive security event logging
 - `secureStyleAnalyzer.ts`: Subscription-aware style analysis
 
@@ -471,19 +503,6 @@ User settings management:
 - Account information
 - Subscription management links
 
-#### `PricingModal.tsx`
-Enhanced subscription tier comparison:
-- **Updated**: Clear tone control feature differentiation
-- Feature comparison with security implications
-- Upgrade flows
-
-#### `SubscriptionManagement.tsx`
-**Enhanced**: Subscription management with real billing data:
-- **Enhanced**: Integration with Supabase billing_history table
-- **Enhanced**: Real billing data instead of mock data
-- **Enhanced**: Proper pricing modal integration
-- **Enhanced**: Responsive design for all screen sizes
-
 ## State Management
 
 ### **Enhanced**: Security-Aware State Management with Session Handling
@@ -492,6 +511,7 @@ Enhanced subscription tier comparison:
 - **Enhanced**: Subscription validation state
 - **Enhanced**: Session state management with sign-out detection
 - **Enhanced**: Automatic state cleanup on sign-out
+- **Enhanced**: Token usage state management
 - Form state management with validation
 - UI state (modals, loading, errors, security alerts)
 
@@ -501,6 +521,7 @@ Enhanced subscription tier comparison:
 - **Enhanced**: Subscription limits computed with security validation
 - **Enhanced**: Security event tracking
 - **Enhanced**: Session state cleanup on sign-out
+- **Enhanced**: Token usage tracking and display
 
 ### Data Persistence with Audit Trails
 - Writing samples: Supabase database (with access logging)
@@ -508,10 +529,11 @@ Enhanced subscription tier comparison:
 - Session state: Supabase Auth (with security events and cleanup)
 - **Enhanced**: Security audit logs: Permanent database storage
 - **Enhanced**: Billing history: Real Supabase integration
+- **Enhanced**: Token usage: Real-time tracking
 
 ## Responsive Design
 
-### **New Section**: Comprehensive Responsive Design System
+### **Enhanced**: Comprehensive Responsive Design System
 
 #### Design Principles
 - **Mobile-First**: All components designed for mobile, then enhanced for larger screens
@@ -539,6 +561,7 @@ Enhanced subscription tier comparison:
 - **Mobile**: Stacked header layout, compact controls, hidden text on small buttons
 - **Tablet**: Balanced two-column layouts where appropriate
 - **Desktop**: Full multi-column layouts with enhanced spacing
+- **Enhanced**: Token usage display adapts to screen size
 
 ##### **ToneControls Component**
 - **Mobile**: Stacked preset grids, touch-optimized sliders
@@ -577,7 +600,7 @@ mb-4 sm:mb-6 lg:mb-8                /* Margins */
 
 ### **Enhanced**: Production Deployment Information
 - **Primary Platform**: Netlify
-- **Live URL**: https://magenta-profiterole-cbb39d.netlify.app
+- **Live URL**: https://tweakmytext.netlify.app
 - **Build Process**: Automated via Netlify
 - **Environment**: Production-ready with security features and responsive design
 
@@ -608,6 +631,7 @@ npm run build
 - Subscription validation enforced
 - All security policies enabled
 - Responsive design optimized for all devices
+- Token system fully operational
 
 ## Development Setup
 
@@ -634,7 +658,7 @@ cp .env.example .env
 npm run dev
 ```
 
-### **Enhanced**: Database Setup with Security
+### **Enhanced**: Database Setup with Security and Token System
 1. Create Supabase project
 2. Run migrations in order:
    - `20250610021118_lucky_trail.sql` (users table)
@@ -647,6 +671,7 @@ npm run dev
    - `20250616012605_lucky_sky.sql` (Premium tier updates)
    - `20250617015502_snowy_palace.sql` (security audit system)
    - `20250618005630_heavy_disk.sql` (billing history)
+   - `20250618020049_crimson_spark.sql` (token system migration)
 
 ### Development Commands
 ```bash
@@ -664,6 +689,7 @@ npm run lint         # Run ESLint
 - **Enhanced**: Security event logging testing
 - **Enhanced**: Responsive design testing
 - **Enhanced**: Session management testing
+- **Enhanced**: Token system testing
 - Integration testing for user flows with security
 - Database testing with Supabase local development
 - API testing with mock services
@@ -678,19 +704,27 @@ src/
 │   ├── utils/
 │   ├── security/          # Security testing
 │   ├── responsive/        # Responsive design testing
+│   ├── tokens/            # Token system testing
 │   └── integration/
 ```
 
 ### **Enhanced**: Security Test Cases
 - Subscription tier validation
 - Tone control access restrictions
-- Credit limit enforcement
+- Token limit enforcement
 - Export limit validation
 - Security event logging
 - Rate limiting functionality
 - Session management and cleanup
 
-### **New**: Responsive Design Test Cases
+### **Enhanced**: Token System Test Cases
+- Token usage estimation accuracy
+- Daily/monthly limit enforcement
+- Token reset functionality
+- Token formatting display
+- Usage tracking accuracy
+
+### **Enhanced**: Responsive Design Test Cases
 - Mobile layout validation
 - Touch target size verification
 - Typography scaling tests
@@ -707,6 +741,7 @@ src/
 - **Enhanced**: Subscription validation caching
 - **Enhanced**: Security event batching for performance
 - **Enhanced**: Responsive image optimization
+- **Enhanced**: Token calculation optimization
 
 ### Performance Monitoring with Security
 - Bundle size analysis
@@ -715,6 +750,7 @@ src/
 - API response times (with priority processing)
 - **Enhanced**: Security event processing performance
 - **Enhanced**: Responsive design performance metrics
+- **Enhanced**: Token calculation performance
 
 ### **Enhanced**: Security-Aware Caching Strategy
 - Browser caching for static assets
@@ -723,6 +759,7 @@ src/
 - API response caching (subscription-aware)
 - **Enhanced**: Subscription validation result caching
 - **Enhanced**: Responsive asset caching
+- **Enhanced**: Token usage calculation caching
 
 ## Security
 
@@ -737,6 +774,7 @@ src/
 - **Enhanced**: Rate limiting and abuse prevention
 - **Enhanced**: Security event monitoring
 - **Enhanced**: Session security with proper cleanup
+- **Enhanced**: Token usage validation and limits
 
 ### **Enhanced**: Data Protection with Audit Trails
 - **Encryption**: Data encrypted at rest and in transit
@@ -746,6 +784,7 @@ src/
 - **Enhanced**: Security incident detection
 - **Enhanced**: Subscription bypass prevention
 - **Enhanced**: Session data protection
+- **Enhanced**: Token usage audit trails
 
 ### **Enhanced**: API Security with Subscription Validation
 - **Rate Limiting**: Prevent API abuse (with logging)
@@ -754,17 +793,19 @@ src/
 - **Input Sanitization**: Prevent injection attacks
 - **Enhanced**: Subscription tier enforcement
 - **Enhanced**: Security event correlation
+- **Enhanced**: Token usage validation
 
 ### **Enhanced**: Subscription Security Model
 ```typescript
 // Security validation flow
 1. User attempts action
 2. Validate subscription tier
-3. Log security event
-4. Allow/deny with audit trail
-5. Monitor for bypass attempts
-6. Rate limit suspicious activity
-7. Handle session security
+3. Check token availability
+4. Log security event
+5. Allow/deny with audit trail
+6. Monitor for bypass attempts
+7. Rate limit suspicious activity
+8. Handle session security
 ```
 
 ## Troubleshooting
@@ -804,7 +845,29 @@ const toneEvents = await supabase
   .eq('user_id', user.id);
 ```
 
-#### **New**: Session Management Issues
+#### **Enhanced**: Token System Issues
+```typescript
+// Debug token calculations with security context
+console.log('User tokens:', user.tokens_remaining);
+console.log('Daily used:', user.daily_tokens_used);
+console.log('Monthly used:', user.monthly_tokens_used);
+console.log('Last reset:', user.last_token_reset);
+
+// Check token-related security events
+const tokenEvents = await supabase
+  .from('security_audit_log')
+  .select('*')
+  .eq('resource', 'tokens')
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false });
+
+// Test token estimation
+const testText = "Sample text for estimation";
+const estimatedTokens = Math.ceil(testText.length / 4);
+console.log('Estimated tokens:', estimatedTokens);
+```
+
+#### **Enhanced**: Session Management Issues
 ```typescript
 // Debug session state
 const { data: { session } } = await supabase.auth.getSession();
@@ -815,7 +878,7 @@ console.log('User state after sign-out:', user);
 console.log('Current view after sign-out:', currentView);
 ```
 
-#### **New**: Responsive Design Issues
+#### **Enhanced**: Responsive Design Issues
 ```css
 /* Debug responsive breakpoints */
 @media (max-width: 640px) {
@@ -864,23 +927,10 @@ SELECT * FROM security_audit_log WHERE user_id = auth.uid() LIMIT 5;
 
 -- Check billing history access
 SELECT * FROM billing_history WHERE user_id = auth.uid() LIMIT 5;
-```
 
-#### **Enhanced**: Credit System Issues with Security
-```typescript
-// Debug credit calculations with security context
-console.log('User credits:', user.credits_remaining);
-console.log('Daily used:', user.daily_credits_used);
-console.log('Monthly used:', user.monthly_credits_used);
-console.log('Last reset:', user.last_credit_reset);
-
-// Check credit-related security events
-const creditEvents = await supabase
-  .from('security_audit_log')
-  .select('*')
-  .eq('resource', 'credits')
-  .eq('user_id', user.id)
-  .order('created_at', { ascending: false });
+-- Check token system migration
+SELECT tokens_remaining, daily_tokens_used, monthly_tokens_used 
+FROM users WHERE id = auth.uid();
 ```
 
 #### **Enhanced**: API Integration Issues with Security
@@ -909,7 +959,7 @@ const testSecureClaudeAPI = async () => {
 };
 ```
 
-#### **New**: Responsive Design Issues
+#### **Enhanced**: Responsive Design Issues
 ```typescript
 // Debug responsive behavior
 const checkResponsive = () => {
@@ -935,18 +985,20 @@ VITE_DEBUG=true
 - Rate limiting violation monitoring
 - Audit log analysis tools
 - Session security monitoring
+- Token usage monitoring
 
 ## Contributing
 
 ### Development Workflow
 1. Create feature branch
 2. Implement changes with security considerations
-3. Add tests (including security and responsive tests)
+3. Add tests (including security, responsive, and token tests)
 4. Update documentation
 5. **Enhanced**: Verify security audit logging
 6. **Enhanced**: Test responsive design across devices
 7. **Enhanced**: Verify session management
-8. Submit pull request
+8. **Enhanced**: Test token system functionality
+9. Submit pull request
 
 ### **Enhanced**: Security Code Standards
 - TypeScript strict mode
@@ -957,16 +1009,18 @@ VITE_DEBUG=true
 - **Enhanced**: Comprehensive audit logging for user actions
 - **Enhanced**: Input validation and sanitization
 - **Enhanced**: Responsive design standards
+- **Enhanced**: Token system validation
 
 ### **Enhanced**: Security Review Process
 - Code review required (including security review)
-- Test coverage maintained (including security and responsive tests)
+- Test coverage maintained (including security, responsive, and token tests)
 - Documentation updated (including security implications)
 - Performance impact assessed (including security overhead)
 - **Enhanced**: Security audit log verification
 - **Enhanced**: Subscription validation testing
 - **Enhanced**: Responsive design validation
 - **Enhanced**: Session management testing
+- **Enhanced**: Token system validation
 
 ---
 
@@ -975,8 +1029,8 @@ VITE_DEBUG=true
 ### **Enhanced**: Security Event Types
 - `user_sign_in` / `user_sign_out` / `sign_in_failed` / `sign_up_failed`
 - `user_sign_out_attempt` / `user_profile_created` / `user_profile_fetch_error`
-- `credit_usage_attempt` / `credit_limit_exceeded` / `credits_used`
-- `daily_credit_limit_exceeded` / `monthly_credit_limit_exceeded`
+- `token_usage_attempt` / `token_limit_exceeded` / `tokens_used`
+- `daily_token_limit_exceeded` / `monthly_token_limit_exceeded`
 - `export_attempt` / `export_limit_exceeded` / `export_successful` / `export_unlimited`
 - `tone_control_access` / `subscription_bypass_attempt`
 - `rate_limit_violation`
@@ -989,21 +1043,23 @@ VITE_DEBUG=true
 - **v5**: Premium tier features
 - **v6**: Security audit system and subscription validation
 - **v7**: Billing history integration
+- **v8**: Token system migration and implementation
 
 ### **Enhanced**: Security Architecture
-- **Frontend**: Subscription validation + security error handling + session management
-- **Backend**: Database functions + audit logging + RLS policies + billing integration
-- **API**: Secure Claude integration + subscription-aware processing
+- **Frontend**: Subscription validation + security error handling + session management + token tracking
+- **Backend**: Database functions + audit logging + RLS policies + billing integration + token management
+- **API**: Secure Claude integration + subscription-aware processing + token usage tracking
 
 ### **Enhanced**: Responsive Design Architecture
 - **Mobile-First**: All components start with mobile design
 - **Progressive Enhancement**: Features added for larger screens
 - **Touch-Optimized**: All interactions work on touch devices
 - **Flexible Layouts**: Components adapt to any screen size
+- **Token Display**: Responsive token formatting and display
 
 ### API Endpoints
-- **Supabase**: Database operations, authentication, security logging, billing
-- **Claude API**: Text rewriting service (subscription-aware)
+- **Supabase**: Database operations, authentication, security logging, billing, token management
+- **Claude API**: Text rewriting service (subscription-aware with token tracking)
 - **Netlify**: Deployment and hosting
 
 ### External Dependencies
@@ -1019,6 +1075,7 @@ VITE_DEBUG=true
 - Rate limiting implementation
 - Access control matrix
 - Session management system
+- Token usage tracking system
 
 ### Performance Benchmarks
 - **Initial Load**: < 2s
@@ -1027,6 +1084,7 @@ VITE_DEBUG=true
 - **Bundle Size**: < 1MB
 - **Enhanced**: Security Event Logging: < 100ms overhead
 - **Enhanced**: Responsive Layout Shift: < 0.1 CLS
+- **Enhanced**: Token Calculation: < 10ms
 
 ### **Enhanced**: Security Metrics
 - **Subscription Validation**: < 50ms
@@ -1034,11 +1092,19 @@ VITE_DEBUG=true
 - **Rate Limit Check**: < 10ms
 - **Access Control Validation**: < 25ms
 - **Session Validation**: < 30ms
+- **Token Usage Calculation**: < 15ms
 
-### **New**: Responsive Design Metrics
+### **Enhanced**: Responsive Design Metrics
 - **Mobile Performance**: 90+ Lighthouse score
 - **Touch Target Size**: Minimum 44px
 - **Font Readability**: 16px minimum on mobile
 - **Layout Shift**: < 0.1 CLS across all breakpoints
+- **Token Display**: Readable on all screen sizes
 
-This documentation provides a comprehensive overview of the TweakMyText application architecture, implementation details, security features, responsive design system, session management, and operational procedures for developers working on the project.
+### **Enhanced**: Token System Metrics
+- **Token Estimation Accuracy**: ±5% of actual usage
+- **Token Formatting Performance**: < 5ms
+- **Usage Tracking Latency**: < 50ms
+- **Reset Function Performance**: < 200ms
+
+This documentation provides a comprehensive overview of the TweakMyText application architecture, implementation details, security features, responsive design system, session management, token system, and operational procedures for developers working on the project.
