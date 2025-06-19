@@ -55,7 +55,7 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         hasExtendedAnalysis: false,
         hasPriorityProcessing: true,
         processingPriority: 'priority',
-        maxWritingSamples: 25,
+        maxWritingSamples: 25, // Fixed: Pro tier should have 25 samples
         dailyLimit: -1, // Unlimited
         monthlyLimit: 5000000,
         exportLimit: 200,
