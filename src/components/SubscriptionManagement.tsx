@@ -56,37 +56,10 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
 
       if (error) {
         console.error('Error loading billing history:', error);
-        // Fall back to mock data if database query fails
         setBillingHistory([]);
-      } else if (realBillingData && realBillingData.length > 0) {
-        // Use real billing data
-        setBillingHistory(realBillingData);
       } else {
-        // No real billing data, create sample data for testing if user has paid subscription
-        if (user.subscription_tier !== 'free') {
-          const tierPrice = user.subscription_tier === 'pro' ? 10 : 18;
-          const currentDate = new Date();
-          
-          // Generate sample billing history for testing
-          const mockBillingData: BillingRecord[] = [];
-          for (let i = 0; i < 3; i++) {
-            const billingDate = new Date(currentDate);
-            billingDate.setMonth(billingDate.getMonth() - i);
-            
-            mockBillingData.push({
-              id: `sample_bill_${i + 1}`,
-              amount: tierPrice,
-              currency: 'USD',
-              status: 'paid',
-              description: `${user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)} Plan - Sample Data`,
-              created_at: billingDate.toISOString(),
-              subscription_tier: user.subscription_tier
-            });
-          }
-          setBillingHistory(mockBillingData);
-        } else {
-          setBillingHistory([]);
-        }
+        // Use real billing data only - no sample data
+        setBillingHistory(realBillingData || []);
       }
     } catch (error) {
       console.error('Error loading billing history:', error);
@@ -365,11 +338,6 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         <div className="flex items-center gap-3 mb-6">
           <Receipt className="w-5 h-5 text-gray-600" />
           <h3 className="text-lg font-bold text-gray-800">Billing History</h3>
-          {user.subscription_tier !== 'free' && billingHistory.length > 0 && billingHistory[0].id.startsWith('sample_') && (
-            <div className="text-xs text-blue-600 bg-blue-100 border border-blue-200 rounded px-2 py-1">
-              Sample Data
-            </div>
-          )}
         </div>
         
         {loadingBilling ? (
