@@ -10,7 +10,13 @@ export const useAuth = () => {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Session error:', error);
+        setLoading(false);
+        return;
+      }
+      
       if (session?.user) {
         fetchUserProfile(session.user);
       } else {
@@ -57,9 +63,15 @@ export const useAuth = () => {
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
+      console.log('Fetching user profile for:', authUser.id);
+      
       // Reset daily/monthly tokens if needed
-      await supabase.rpc('reset_daily_tokens');
-      await supabase.rpc('reset_monthly_tokens');
+      try {
+        await supabase.rpc('reset_daily_tokens');
+        await supabase.rpc('reset_monthly_tokens');
+      } catch (rpcError) {
+        console.warn('Token reset functions not available:', rpcError);
+      }
 
       const { data, error } = await supabase
         .from('users')
@@ -68,6 +80,7 @@ export const useAuth = () => {
         .single();
 
       if (error && error.code === 'PGRST116') {
+        console.log('User profile not found, creating new one...');
         // User doesn't exist, create new profile
         const newUser = {
           id: authUser.id,
@@ -87,7 +100,10 @@ export const useAuth = () => {
           .select()
           .single();
 
-        if (createError) throw createError;
+        if (createError) {
+          console.error('Failed to create user profile:', createError);
+          throw createError;
+        }
         
         const userProfile = {
           ...createdUser,
@@ -98,6 +114,7 @@ export const useAuth = () => {
         };
         
         setUser(userProfile);
+        console.log('User profile created successfully:', userProfile);
 
         // Log new user creation
         await logSecurityEvent({
@@ -108,6 +125,7 @@ export const useAuth = () => {
           subscriptionTier: userProfile.subscription_tier,
         });
       } else if (error) {
+        console.error('Database error fetching user profile:', error);
         throw error;
       } else {
         const userProfile = {
@@ -119,9 +137,10 @@ export const useAuth = () => {
         };
         
         setUser(userProfile);
+        console.log('User profile loaded successfully:', userProfile);
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error in fetchUserProfile:', error);
       
       // Log profile fetch error
       await logSecurityEvent({
@@ -139,12 +158,17 @@ export const useAuth = () => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('Attempting sign in for:', email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
+      console.log('Sign in response:', { data: !!data, error });
+      
       if (error) {
+        console.error('Sign in error:', error);
         // Log failed sign-in attempt
         await logSecurityEvent({
           userId: 'unknown',
@@ -158,19 +182,24 @@ export const useAuth = () => {
       
       return { error };
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      console.error('Sign in exception:', error);
       return { error };
     }
   };
 
   const signUp = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('Attempting sign up for:', email);
+      
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
       
+      console.log('Sign up response:', { data: !!data, error });
+      
       if (error) {
+        console.error('Sign up error:', error);
         // Log failed sign-up attempt
         await logSecurityEvent({
           userId: 'unknown',
@@ -184,7 +213,7 @@ export const useAuth = () => {
       
       return { error };
     } catch (error: any) {
-      console.error('Sign up error:', error);
+      console.error('Sign up exception:', error);
       return { error };
     }
   };
@@ -221,7 +250,7 @@ export const useAuth = () => {
       console.log('Sign out completed successfully');
       return { error: null };
     } catch (error: any) {
-      console.error('Sign out error:', error);
+      console.error('Sign out exception:', error);
       // Even if there's an error, clear the local state
       setUser(null);
       setLoading(false);
@@ -231,6 +260,8 @@ export const useAuth = () => {
 
   const updateTokens = async (tokensUsed: number) => {
     if (!user) return { error: new Error('No user found') };
+
+    console.log('Updating tokens:', { tokensUsed, currentTokens: user.tokens_remaining });
 
     // Log token usage attempt
     await logSecurityEvent({
@@ -263,42 +294,50 @@ export const useAuth = () => {
       // Reset daily tokens if it's a new day
       if (user.last_token_reset !== today) {
         const maxDailyTokens = Math.min(100000, limits.monthlyLimit - user.monthly_tokens_used);
-        await supabase
-          .from('users')
-          .update({ 
+        try {
+          await supabase
+            .from('users')
+            .update({ 
+              tokens_remaining: maxDailyTokens,
+              daily_tokens_used: 0,
+              last_token_reset: today
+            })
+            .eq('id', user.id);
+          
+          setUser({ 
+            ...user, 
             tokens_remaining: maxDailyTokens,
             daily_tokens_used: 0,
             last_token_reset: today
-          })
-          .eq('id', user.id);
-        
-        setUser({ 
-          ...user, 
-          tokens_remaining: maxDailyTokens,
-          daily_tokens_used: 0,
-          last_token_reset: today
-        });
+          });
+        } catch (error) {
+          console.error('Failed to reset daily tokens:', error);
+        }
       }
 
       // Reset monthly tokens if it's the monthly reset day
       if (currentDay === user.monthly_reset_date && user.last_token_reset !== today) {
-        await supabase
-          .from('users')
-          .update({ 
+        try {
+          await supabase
+            .from('users')
+            .update({ 
+              monthly_tokens_used: 0,
+              monthly_exports_used: 0,
+              tokens_remaining: 100000,
+              daily_tokens_used: 0
+            })
+            .eq('id', user.id);
+          
+          setUser({ 
+            ...user, 
             monthly_tokens_used: 0,
             monthly_exports_used: 0,
             tokens_remaining: 100000,
             daily_tokens_used: 0
-          })
-          .eq('id', user.id);
-        
-        setUser({ 
-          ...user, 
-          monthly_tokens_used: 0,
-          monthly_exports_used: 0,
-          tokens_remaining: 100000,
-          daily_tokens_used: 0
-        });
+          });
+        } catch (error) {
+          console.error('Failed to reset monthly tokens:', error);
+        }
       }
 
       // Check if user has exceeded monthly limit
@@ -345,48 +384,56 @@ export const useAuth = () => {
     const newDailyUsed = user.daily_tokens_used + tokensUsed;
     const newMonthlyUsed = user.monthly_tokens_used + tokensUsed;
     
-    const { error } = await supabase
-      .from('users')
-      .update({ 
-        tokens_remaining: newTokens,
-        daily_tokens_used: newDailyUsed,
-        monthly_tokens_used: newMonthlyUsed
-      })
-      .eq('id', user.id);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          tokens_remaining: newTokens,
+          daily_tokens_used: newDailyUsed,
+          monthly_tokens_used: newMonthlyUsed
+        })
+        .eq('id', user.id);
 
-    if (!error) {
-      setUser({ 
-        ...user, 
-        tokens_remaining: newTokens,
-        daily_tokens_used: newDailyUsed,
-        monthly_tokens_used: newMonthlyUsed
-      });
+      if (!error) {
+        setUser({ 
+          ...user, 
+          tokens_remaining: newTokens,
+          daily_tokens_used: newDailyUsed,
+          monthly_tokens_used: newMonthlyUsed
+        });
 
-      // Log successful token usage
-      await logSecurityEvent({
-        userId: user.id,
-        action: 'tokens_used',
-        resource: 'tokens',
-        allowed: true,
-        subscriptionTier: user.subscription_tier,
-      });
-    } else {
-      // Log token update error
-      await logSecurityEvent({
-        userId: user.id,
-        action: 'token_update_error',
-        resource: 'tokens',
-        allowed: false,
-        subscriptionTier: user.subscription_tier,
-        errorMessage: error.message,
-      });
+        // Log successful token usage
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'tokens_used',
+          resource: 'tokens',
+          allowed: true,
+          subscriptionTier: user.subscription_tier,
+        });
+      } else {
+        console.error('Token update error:', error);
+        // Log token update error
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'token_update_error',
+          resource: 'tokens',
+          allowed: false,
+          subscriptionTier: user.subscription_tier,
+          errorMessage: error.message,
+        });
+      }
+
+      return { error };
+    } catch (error: any) {
+      console.error('Token update exception:', error);
+      return { error };
     }
-
-    return { error };
   };
 
   const updateExports = async (exportsUsed: number) => {
     if (!user) return { error: new Error('No user found') };
+
+    console.log('Updating exports:', { exportsUsed, currentExports: user.monthly_exports_used });
 
     // Log export attempt
     await logSecurityEvent({
@@ -437,35 +484,41 @@ export const useAuth = () => {
       return { error: new Error(`Monthly export limit reached (${limits.monthlyLimit} exports)`) };
     }
 
-    const { error } = await supabase
-      .from('users')
-      .update({ monthly_exports_used: newExportsUsed })
-      .eq('id', user.id);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ monthly_exports_used: newExportsUsed })
+        .eq('id', user.id);
 
-    if (!error) {
-      setUser({ ...user, monthly_exports_used: newExportsUsed });
-      
-      // Log successful export
-      await logSecurityEvent({
-        userId: user.id,
-        action: 'export_successful',
-        resource: 'exports',
-        allowed: true,
-        subscriptionTier: user.subscription_tier,
-      });
-    } else {
-      // Log export error
-      await logSecurityEvent({
-        userId: user.id,
-        action: 'export_error',
-        resource: 'exports',
-        allowed: false,
-        subscriptionTier: user.subscription_tier,
-        errorMessage: error.message,
-      });
+      if (!error) {
+        setUser({ ...user, monthly_exports_used: newExportsUsed });
+        
+        // Log successful export
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'export_successful',
+          resource: 'exports',
+          allowed: true,
+          subscriptionTier: user.subscription_tier,
+        });
+      } else {
+        console.error('Export update error:', error);
+        // Log export error
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'export_error',
+          resource: 'exports',
+          allowed: false,
+          subscriptionTier: user.subscription_tier,
+          errorMessage: error.message,
+        });
+      }
+
+      return { error };
+    } catch (error: any) {
+      console.error('Export update exception:', error);
+      return { error };
     }
-
-    return { error };
   };
 
   return {

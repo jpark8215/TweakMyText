@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown } from 'lucide-react';
+import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown, RefreshCw } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -15,7 +15,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   const { user } = useAuth();
 
@@ -46,74 +46,130 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     }
 
     setIsUpdating(true);
+    setMessage({ type: 'info', text: 'Updating your password...' });
 
     try {
-      console.log('Starting password update...');
+      console.log('Starting password update process...');
       
-      // First, check if we have a valid session
+      // First, verify we have a valid session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError || !session) {
-        console.error('No valid session found:', sessionError);
+      if (sessionError) {
+        console.error('Session error:', sessionError);
         setMessage({ 
           type: 'error', 
-          text: 'Your session has expired. Please sign out and sign back in.' 
+          text: 'Session error. Please sign out and sign back in.' 
         });
         return;
       }
 
-      console.log('Valid session found, updating password...');
+      if (!session?.user) {
+        console.error('No active session found');
+        setMessage({ 
+          type: 'error', 
+          text: 'No active session. Please sign out and sign back in.' 
+        });
+        return;
+      }
+
+      console.log('Valid session found, attempting password update...');
       
-      // Update password with proper error handling
+      // Attempt to update the password
       const { data, error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
-      console.log('Password update response:', { data, error });
+      console.log('Password update result:', { 
+        success: !error, 
+        error: error?.message,
+        data: !!data 
+      });
 
       if (error) {
-        console.error('Password update error:', error);
+        console.error('Password update failed:', error);
         
-        // Handle specific Supabase error cases
+        // Handle specific error cases
+        let errorMessage = 'Password update failed. ';
+        
         switch (error.message) {
           case 'New password should be different from the old password.':
-            setMessage({ type: 'error', text: 'New password must be different from your current password' });
+            errorMessage = 'New password must be different from your current password.';
             break;
           case 'Password should be at least 6 characters.':
-            setMessage({ type: 'error', text: 'Password must be at least 6 characters long' });
+            errorMessage = 'Password must be at least 6 characters long.';
             break;
           case 'Unable to validate email address: invalid format':
-            setMessage({ type: 'error', text: 'There was an issue with your account. Please contact support.' });
+            errorMessage = 'Account validation error. Please contact support.';
             break;
           case 'Invalid login credentials':
-            setMessage({ type: 'error', text: 'Authentication failed. Please sign out and sign back in.' });
+            errorMessage = 'Authentication failed. Please sign out and sign back in.';
+            break;
+          case 'User not found':
+            errorMessage = 'User account not found. Please sign out and sign back in.';
             break;
           default:
-            setMessage({ 
-              type: 'error', 
-              text: `Password update failed: ${error.message}` 
-            });
+            errorMessage += error.message;
         }
+        
+        setMessage({ type: 'error', text: errorMessage });
       } else {
-        console.log('Password updated successfully');
+        console.log('Password updated successfully!');
         setMessage({ type: 'success', text: 'Password updated successfully!' });
         setNewPassword('');
         setConfirmPassword('');
         
-        // Auto-close success message after 3 seconds
+        // Auto-clear success message after 3 seconds
         setTimeout(() => {
           setMessage(null);
         }, 3000);
       }
     } catch (error: any) {
       console.error('Unexpected error during password update:', error);
+      
+      // Check if it's a network error
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        setMessage({ 
+          type: 'error', 
+          text: 'Network error. Please check your connection and try again.' 
+        });
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: 'An unexpected error occurred. Please try again or contact support.' 
+        });
+      }
+    } finally {
+      console.log('Password update process completed');
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRefreshSession = async () => {
+    try {
+      setMessage({ type: 'info', text: 'Refreshing session...' });
+      
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('Session refresh error:', error);
+        setMessage({ 
+          type: 'error', 
+          text: 'Failed to refresh session. Please sign out and sign back in.' 
+        });
+      } else {
+        console.log('Session refreshed successfully');
+        setMessage({ type: 'success', text: 'Session refreshed! You can now try updating your password.' });
+        
+        setTimeout(() => {
+          setMessage(null);
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('Session refresh exception:', error);
       setMessage({ 
         type: 'error', 
-        text: 'An unexpected error occurred. Please try signing out and back in.' 
+        text: 'Failed to refresh session. Please sign out and sign back in.' 
       });
-    } finally {
-      console.log('Setting isUpdating to false');
-      setIsUpdating(false);
     }
   };
 
@@ -183,7 +239,18 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
         {/* Password Change Form */}
         <form onSubmit={handlePasswordUpdate} className="space-y-3 sm:space-y-4">
-          <h3 className="text-gray-800 font-medium mb-3 sm:mb-4 text-sm sm:text-base">Change Password</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-gray-800 font-medium text-sm sm:text-base">Change Password</h3>
+            <button
+              type="button"
+              onClick={handleRefreshSession}
+              disabled={isUpdating}
+              className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2 py-1 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Refresh Session
+            </button>
+          </div>
           
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
@@ -251,11 +318,15 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             <div className={`p-3 rounded-lg border ${
               message.type === 'success' 
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                : message.type === 'info'
+                ? 'bg-blue-50 border-blue-200 text-blue-700'
                 : 'bg-red-50 border-red-200 text-red-600'
             }`}>
               <div className="flex items-center gap-2">
                 {message.type === 'success' ? (
                   <Check className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                ) : message.type === 'info' ? (
+                  <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 animate-spin" />
                 ) : (
                   <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                 )}
@@ -287,7 +358,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
               <p className="text-blue-700 text-xs text-center">
-                💡 Choose a strong password with at least 6 characters
+                💡 If you're having issues, try refreshing your session first
               </p>
             </div>
             {isUpdating && (
@@ -303,3 +374,4 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     </div>
   );
 }
+```
