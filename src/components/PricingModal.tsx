@@ -19,7 +19,8 @@ const pricingTiers: PricingTier[] = [
       'Basic style analysis',
       'Save up to 3 writing samples',
       '5 exports per month',
-      'Export results (limited to 5 per month)'
+      'View-only tone controls (auto-detected)',
+      'Standard processing speed'
     ],
     limits: {
       writingSamples: 3,
@@ -45,8 +46,9 @@ const pricingTiers: PricingTier[] = [
       'Save up to 25 writing samples',
       'Export results (up to 200 per month)',
       'Rewrite history access',
-      'Access to basic tone presets',
-      'Priority processing (2x faster)'
+      'Manual tone adjustment + basic presets',
+      'Priority processing (2x faster)',
+      '6 core tone controls (formality, casual, enthusiasm, technical, creativity, empathy)'
     ],
     popular: true,
     limits: {
@@ -75,7 +77,8 @@ const pricingTiers: PricingTier[] = [
       'Full rewrite history with analytics',
       'Bulk rewrite operations',
       'Custom tone fine-tuning with advanced presets',
-      'Fastest processing (3x speed)'
+      'Fastest processing (3x speed)',
+      'All 10 tone controls (formality, casual, enthusiasm, technical, creativity, empathy, confidence, humor, urgency, clarity)'
     ],
     limits: {
       writingSamples: 100,
@@ -215,19 +218,19 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
                 </div>
               </div>
               <div className="space-y-2">
-                <h4 className="font-medium text-indigo-600">Processing Speed</h4>
+                <h4 className="font-medium text-indigo-600">Tone Controls</h4>
+                <div className="space-y-1 text-gray-700">
+                  <div>Free: View-only (auto-detected)</div>
+                  <div>Pro: 6 adjustable controls + presets</div>
+                  <div>Premium: All 10 controls + custom fine-tuning</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-medium text-purple-600">Processing Speed</h4>
                 <div className="space-y-1 text-gray-700">
                   <div>Free: Standard speed</div>
                   <div>Pro: 2x faster processing</div>
                   <div>Premium: 3x faster processing</div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-medium text-purple-600">Export Options</h4>
-                <div className="space-y-1 text-gray-700">
-                  <div>Free: Limited (5/month)</div>
-                  <div>Pro: Up to 200/month (JSON & TXT)</div>
-                  <div>Premium: Unlimited (All formats)</div>
                 </div>
               </div>
             </div>

@@ -12,6 +12,8 @@ export interface SubscriptionLimits {
   dailyLimit: number;
   monthlyLimit: number;
   exportLimit: number;
+  availableToneControls: string[]; // NEW: Which tone controls are available
+  maxToneControls: number; // NEW: Maximum number of tone controls
 }
 
 export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => {
@@ -28,6 +30,8 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
       dailyLimit: 0,
       monthlyLimit: 0,
       exportLimit: 0,
+      availableToneControls: [],
+      maxToneControls: 0,
     };
   }
 
@@ -45,6 +49,11 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         dailyLimit: -1, // Unlimited
         monthlyLimit: 10000000,
         exportLimit: -1, // Unlimited
+        availableToneControls: [
+          'formality', 'casualness', 'enthusiasm', 'technicality', 
+          'creativity', 'empathy', 'confidence', 'humor', 'urgency', 'clarity'
+        ],
+        maxToneControls: 10,
       };
     case 'pro':
       return {
@@ -55,10 +64,14 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         hasExtendedAnalysis: false,
         hasPriorityProcessing: true,
         processingPriority: 'priority',
-        maxWritingSamples: 25, // Fixed: Pro tier should have 25 samples
+        maxWritingSamples: 25,
         dailyLimit: -1, // Unlimited
         monthlyLimit: 5000000,
         exportLimit: 200,
+        availableToneControls: [
+          'formality', 'casualness', 'enthusiasm', 'technicality', 'creativity', 'empathy'
+        ],
+        maxToneControls: 6,
       };
     default: // free
       return {
@@ -73,6 +86,8 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         dailyLimit: 100000,
         monthlyLimit: 1000000,
         exportLimit: 5,
+        availableToneControls: [], // View-only, no modification
+        maxToneControls: 0,
       };
   }
 };
@@ -83,7 +98,7 @@ export const validateToneAccess = (user: User | null, action: string): void => {
   switch (action) {
     case 'modify_tone':
       if (!limits.canModifyTone) {
-        throw new Error('Tone customization requires Pro or Premium subscription');
+        throw new Error('Tone customization requires Pro or Premium subscription. Free users have view-only access to auto-detected tone settings.');
       }
       break;
     case 'use_presets':
@@ -119,14 +134,32 @@ export const validateToneAccess = (user: User | null, action: string): void => {
 export const validateToneSettings = (user: User | null, toneSettings: any): void => {
   const limits = getSubscriptionLimits(user);
 
-  // Check if user is trying to use custom tone settings
-  const defaultSettings = { formality: 50, casualness: 50, enthusiasm: 50, technicality: 50 };
-  const hasCustomSettings = Object.keys(toneSettings).some(
-    key => Math.abs(toneSettings[key] - defaultSettings[key]) > 5 // Allow 5% tolerance for auto-detection
+  // Free users cannot modify any tone settings
+  if (!limits.canModifyTone) {
+    // Check if user is trying to use custom tone settings
+    const defaultSettings = { 
+      formality: 50, casualness: 50, enthusiasm: 50, technicality: 50,
+      creativity: 50, empathy: 50, confidence: 50, humor: 50, urgency: 50, clarity: 50
+    };
+    
+    const hasCustomSettings = Object.keys(toneSettings).some(
+      key => Math.abs(toneSettings[key] - (defaultSettings[key] || 50)) > 5 // Allow 5% tolerance for auto-detection
+    );
+
+    if (hasCustomSettings) {
+      throw new Error('Custom tone settings require Pro or Premium subscription. Free users have view-only access.');
+    }
+    return;
+  }
+
+  // Check if user is trying to use tone controls not available in their tier
+  const unavailableControls = Object.keys(toneSettings).filter(
+    control => !limits.availableToneControls.includes(control)
   );
 
-  if (hasCustomSettings && !limits.canModifyTone) {
-    throw new Error('Custom tone settings require Pro or Premium subscription');
+  if (unavailableControls.length > 0) {
+    const tierName = user?.subscription_tier === 'pro' ? 'Premium' : 'Pro or Premium';
+    throw new Error(`The following tone controls require ${tierName} subscription: ${unavailableControls.join(', ')}`);
   }
 };
 

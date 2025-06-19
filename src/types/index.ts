@@ -28,6 +28,12 @@ export interface ToneSettings {
   casualness: number; // 0-100
   enthusiasm: number; // 0-100
   technicality: number; // 0-100
+  creativity: number; // 0-100 (NEW)
+  empathy: number; // 0-100 (NEW)
+  confidence: number; // 0-100 (NEW)
+  humor: number; // 0-100 (NEW)
+  urgency: number; // 0-100 (NEW)
+  clarity: number; // 0-100 (NEW)
 }
 
 export interface User {

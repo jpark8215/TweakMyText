@@ -11,20 +11,32 @@ import {
 // Secure version of analyzeToneFromSamples with subscription validation
 export const analyzeToneFromSamples = (samples: WritingSample[], user: User | null): ToneSettings => {
   if (samples.length === 0) {
-    return { formality: 50, casualness: 50, enthusiasm: 50, technicality: 50 };
+    return { 
+      formality: 50, casualness: 50, enthusiasm: 50, technicality: 50,
+      creativity: 50, empathy: 50, confidence: 50, humor: 50, urgency: 50, clarity: 50
+    };
   }
 
+  const limits = getSubscriptionLimits(user);
   const analysisLevel = getAnalysisLevel(user);
   const allText = samples.map(s => s.content).join(' ').toLowerCase();
   const words = allText.split(/\s+/);
   
-  // Basic analysis for all users
-  let formality = 50;
-  let casualness = 50;
-  let enthusiasm = 50;
-  let technicality = 50;
+  // Initialize all tone settings to default
+  let toneSettings: ToneSettings = {
+    formality: 50,
+    casualness: 50,
+    enthusiasm: 50,
+    technicality: 50,
+    creativity: 50,
+    empathy: 50,
+    confidence: 50,
+    humor: 50,
+    urgency: 50,
+    clarity: 50
+  };
 
-  // Basic tone detection
+  // Basic tone detection for core controls
   const formalWords = ['however', 'furthermore', 'therefore', 'consequently'];
   const casualWords = ['gonna', 'wanna', 'kinda', 'yeah'];
   
@@ -33,31 +45,43 @@ export const analyzeToneFromSamples = (samples: WritingSample[], user: User | nu
   const casualCount = casualWords.reduce((count, word) => 
     count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
   
-  formality = Math.min(100, Math.max(0, 50 + (formalCount - casualCount) * 10));
+  toneSettings.formality = Math.min(100, Math.max(0, 50 + (formalCount - casualCount) * 10));
 
   // Advanced analysis for Pro/Premium users
   if (analysisLevel === 'advanced' || analysisLevel === 'extended') {
     try {
       validateToneAccess(user, 'advanced_analysis');
       
-      // More sophisticated analysis
+      // More sophisticated analysis for Pro tier controls
       const conversationalIndicators = ['i think', 'i believe', 'you know', 'honestly'];
       const conversationalCount = conversationalIndicators.reduce((count, phrase) => 
         count + (allText.match(new RegExp(phrase, 'g')) || []).length, 0);
       
-      casualness = Math.min(100, Math.max(0, 30 + conversationalCount * 15));
+      toneSettings.casualness = Math.min(100, Math.max(0, 30 + conversationalCount * 15));
       
       const exclamationCount = (allText.match(/!/g) || []).length;
       const enthusiasticWords = ['amazing', 'awesome', 'fantastic', 'love'];
       const enthusiasticCount = enthusiasticWords.reduce((count, word) => 
         count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
       
-      enthusiasm = Math.min(100, Math.max(0, 30 + exclamationCount * 8 + enthusiasticCount * 12));
+      toneSettings.enthusiasm = Math.min(100, Math.max(0, 30 + exclamationCount * 8 + enthusiasticCount * 12));
       
       const avgWordLength = words.reduce((sum, word) => sum + word.length, 0) / words.length;
       const longWords = words.filter(word => word.length > 8).length;
       
-      technicality = Math.min(100, Math.max(0, 20 + (avgWordLength - 4) * 8 + longWords * 2));
+      toneSettings.technicality = Math.min(100, Math.max(0, 20 + (avgWordLength - 4) * 8 + longWords * 2));
+
+      // Pro tier additional controls
+      const creativeWords = ['innovative', 'unique', 'creative', 'original'];
+      const creativeCount = creativeWords.reduce((count, word) => 
+        count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+      toneSettings.creativity = Math.min(100, Math.max(0, 40 + creativeCount * 15));
+
+      const empathyWords = ['understand', 'feel', 'empathize', 'appreciate'];
+      const empathyCount = empathyWords.reduce((count, word) => 
+        count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+      toneSettings.empathy = Math.min(100, Math.max(0, 40 + empathyCount * 12));
+
     } catch (error) {
       console.warn('Advanced analysis not available for user subscription tier');
     }
@@ -69,24 +93,37 @@ export const analyzeToneFromSamples = (samples: WritingSample[], user: User | nu
       validateToneAccess(user, 'extended_analysis');
       
       // Premium-only extended analysis features
-      const technicalWords = ['implementation', 'methodology', 'optimization', 'architecture'];
-      const technicalCount = technicalWords.reduce((count, word) => 
+      const confidenceWords = ['confident', 'certain', 'sure', 'definitely'];
+      const confidenceCount = confidenceWords.reduce((count, word) => 
         count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
-      
-      technicality = Math.min(100, Math.max(technicality, technicality + technicalCount * 15));
-      
-      // Additional premium analysis features could be added here
+      toneSettings.confidence = Math.min(100, Math.max(0, 45 + confidenceCount * 15));
+
+      const humorWords = ['funny', 'hilarious', 'joke', 'laugh'];
+      const humorCount = humorWords.reduce((count, word) => 
+        count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+      toneSettings.humor = Math.min(100, Math.max(0, 30 + humorCount * 20));
+
+      const urgencyWords = ['urgent', 'immediately', 'asap', 'quickly'];
+      const urgencyCount = urgencyWords.reduce((count, word) => 
+        count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+      toneSettings.urgency = Math.min(100, Math.max(0, 35 + urgencyCount * 18));
+
+      const clarityWords = ['clear', 'obvious', 'simple', 'straightforward'];
+      const clarityCount = clarityWords.reduce((count, word) => 
+        count + (allText.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length, 0);
+      toneSettings.clarity = Math.min(100, Math.max(0, 50 + clarityCount * 12));
+
     } catch (error) {
       console.warn('Extended analysis not available for user subscription tier');
     }
   }
 
-  return {
-    formality: Math.round(formality),
-    casualness: Math.round(casualness),
-    enthusiasm: Math.round(enthusiasm),
-    technicality: Math.round(technicality)
-  };
+  // Round all values
+  Object.keys(toneSettings).forEach(key => {
+    toneSettings[key as keyof ToneSettings] = Math.round(toneSettings[key as keyof ToneSettings]);
+  });
+
+  return toneSettings;
 };
 
 // Secure rewrite function with comprehensive validation
@@ -162,6 +199,15 @@ const secureRewriteTextMock = async (
         .replace(/\bbut\b/gi, 'however')
         .replace(/\bso\b/gi, 'therefore');
     }
+
+    // Apply Pro-tier tone controls
+    if (toneSettings.creativity > 70) {
+      rewritten = rewritten.replace(/\bgood\b/gi, 'innovative');
+    }
+    
+    if (toneSettings.empathy > 70) {
+      rewritten = rewritten.replace(/\bI think\b/gi, 'I understand that');
+    }
   }
   
   // Extended transformations for Premium users only
@@ -175,6 +221,23 @@ const secureRewriteTextMock = async (
     // Premium-only style improvements
     if (samples.some(s => s.content.includes('I think') || s.content.includes('I believe'))) {
       rewritten = rewritten.replace(/It is/g, 'I think it is');
+    }
+
+    // Apply Premium-tier tone controls
+    if (toneSettings.confidence > 70) {
+      rewritten = rewritten.replace(/\bmight\b/gi, 'will');
+    }
+    
+    if (toneSettings.humor > 60) {
+      rewritten = rewritten.replace(/\binteresting\b/gi, 'amusing');
+    }
+    
+    if (toneSettings.urgency > 70) {
+      rewritten = rewritten.replace(/\bsoon\b/gi, 'immediately');
+    }
+    
+    if (toneSettings.clarity > 70) {
+      rewritten = rewritten.replace(/\bcomplex\b/gi, 'straightforward');
     }
   }
 
@@ -208,6 +271,12 @@ const analyzeWritingStyleSecure = (samples: WritingSample[], analysisLevel: 'bas
     if (allText.includes('basically') || allText.includes('honestly')) {
       tags.push('conversational');
     }
+    if (allText.includes('creative') || allText.includes('innovative')) {
+      tags.push('creative');
+    }
+    if (allText.includes('understand') || allText.includes('feel')) {
+      tags.push('empathetic');
+    }
   }
 
   // Extended analysis for Premium users only
@@ -221,6 +290,18 @@ const analyzeWritingStyleSecure = (samples: WritingSample[], analysisLevel: 'bas
     // Additional premium-only style tags
     if (allText.includes('implementation') || allText.includes('methodology')) {
       tags.push('professional');
+    }
+    if (allText.includes('confident') || allText.includes('certain')) {
+      tags.push('confident');
+    }
+    if (allText.includes('funny') || allText.includes('hilarious')) {
+      tags.push('humorous');
+    }
+    if (allText.includes('urgent') || allText.includes('immediately')) {
+      tags.push('urgent');
+    }
+    if (allText.includes('clear') || allText.includes('straightforward')) {
+      tags.push('clear');
     }
   }
 
