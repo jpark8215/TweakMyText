@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown, RefreshCw } from 'lucide-react';
+import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown, RefreshCw, Star, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -15,6 +15,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   const { user } = useAuth();
@@ -161,6 +162,53 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     }
   };
 
+  const handleUpgradeToTier = async (tier: 'pro' | 'premium') => {
+    if (isUpgrading) return;
+    
+    setIsUpgrading(true);
+    setMessage({ type: 'info', text: `Upgrading to ${tier}...` });
+
+    try {
+      // Calculate new token amounts based on tier
+      const tokenAmounts = {
+        pro: { monthly: 5000000, daily: -1 }, // No daily limit
+        premium: { monthly: 10000000, daily: -1 } // No daily limit
+      };
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          subscription_tier: tier,
+          tokens_remaining: tokenAmounts[tier].monthly,
+          monthly_tokens_used: 0,
+          daily_tokens_used: 0,
+          monthly_exports_used: 0,
+          subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Upgrade error:', error);
+        setMessage({ type: 'error', text: 'Failed to upgrade subscription. Please try again.' });
+      } else {
+        setMessage({ 
+          type: 'success', 
+          text: `Successfully upgraded to ${tier.charAt(0).toUpperCase() + tier.slice(1)}! Please refresh the page.` 
+        });
+        
+        // Auto-refresh after 2 seconds
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Upgrade exception:', error);
+      setMessage({ type: 'error', text: 'An error occurred during upgrade. Please try again.' });
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
   const handleRefreshSession = async () => {
     try {
       setMessage({ type: 'info', text: 'Refreshing session...' });
@@ -192,8 +240,8 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
   const handleClose = () => {
     // Don't allow closing while updating
-    if (isUpdating) {
-      console.log('Cannot close modal while password update is in progress');
+    if (isUpdating || isUpgrading) {
+      console.log('Cannot close modal while update is in progress');
       return;
     }
     
@@ -207,7 +255,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
   const handleManageSubscriptionClick = () => {
     // Don't allow navigation while updating
-    if (isUpdating) return;
+    if (isUpdating || isUpgrading) return;
     
     handleClose();
     onManageSubscription?.();
@@ -229,7 +277,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
           </div>
           <button
             onClick={handleClose}
-            disabled={isUpdating}
+            disabled={isUpdating || isUpgrading}
             className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -240,16 +288,54 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-200">
           <h3 className="text-gray-800 font-medium mb-2 text-sm sm:text-base">Account Information</h3>
           <p className="text-gray-600 text-xs sm:text-sm break-all">{user.email}</p>
-          <p className="text-gray-500 text-xs mt-1">
-            Plan: <span className="text-blue-600 capitalize">{user.subscription_tier}</span>
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-gray-500 text-xs">Plan:</span>
+            <span className={`text-xs font-medium capitalize px-2 py-1 rounded-full ${
+              user.subscription_tier === 'premium' ? 'bg-amber-100 text-amber-700' :
+              user.subscription_tier === 'pro' ? 'bg-blue-100 text-blue-700' :
+              'bg-gray-100 text-gray-700'
+            }`}>
+              {user.subscription_tier}
+            </span>
+          </div>
         </div>
+
+        {/* Testing Upgrade Section */}
+        {user.subscription_tier === 'free' && (
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
+            <h3 className="text-gray-800 font-medium mb-2 text-sm sm:text-base flex items-center gap-2">
+              <Zap className="w-4 h-4 text-blue-600" />
+              Testing Mode - Upgrade Subscription
+            </h3>
+            <p className="text-gray-600 text-xs mb-3">
+              For testing purposes, you can upgrade your account to Pro or Premium to test premium features.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleUpgradeToTier('pro')}
+                disabled={isUpgrading || isUpdating}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Crown className="w-3 h-3" />
+                Upgrade to Pro
+              </button>
+              <button
+                onClick={() => handleUpgradeToTier('premium')}
+                disabled={isUpgrading || isUpdating}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Star className="w-3 h-3" />
+                Upgrade to Premium
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Subscription Management */}
         <div className="mb-4 sm:mb-6">
           <button
             onClick={handleManageSubscriptionClick}
-            disabled={isUpdating}
+            disabled={isUpdating || isUpgrading}
             className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg shadow-indigo-500/25 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -264,7 +350,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             <button
               type="button"
               onClick={handleRefreshSession}
-              disabled={isUpdating}
+              disabled={isUpdating || isUpgrading}
               className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2 py-1 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
             >
               <RefreshCw className="w-3 h-3" />
@@ -282,7 +368,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                disabled={isUpdating}
+                disabled={isUpdating || isUpgrading}
                 className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Enter new password"
                 required
@@ -292,7 +378,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
               <button
                 type="button"
                 onClick={() => setShowNewPassword(!showNewPassword)}
-                disabled={isUpdating}
+                disabled={isUpdating || isUpgrading}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {showNewPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
@@ -313,7 +399,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={isUpdating}
+                disabled={isUpdating || isUpgrading}
                 className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Confirm new password"
                 required
@@ -323,7 +409,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                disabled={isUpdating}
+                disabled={isUpdating || isUpgrading}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
@@ -357,7 +443,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
           <button
             type="submit"
-            disabled={isUpdating || !isFormValid}
+            disabled={isUpdating || isUpgrading || !isFormValid}
             className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
           >
             {isUpdating ? (
@@ -381,10 +467,10 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 💡 If you're having issues, try refreshing your session first
               </p>
             </div>
-            {isUpdating && (
+            {(isUpdating || isUpgrading) && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
                 <p className="text-amber-700 text-xs text-center">
-                  ⏳ Please wait while we update your password (max 30 seconds)
+                  ⏳ Please wait while we process your request (max 30 seconds)
                 </p>
               </div>
             )}
