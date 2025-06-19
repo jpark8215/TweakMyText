@@ -25,7 +25,10 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     e.preventDefault();
     
     // Prevent multiple submissions
-    if (isUpdating) return;
+    if (isUpdating) {
+      console.log('Password update already in progress, ignoring submission');
+      return;
+    }
     
     setMessage(null);
 
@@ -45,53 +48,59 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
       return;
     }
 
+    console.log('Starting password update process...');
     setIsUpdating(true);
     setMessage({ type: 'info', text: 'Updating your password...' });
 
+    // Set a timeout to prevent infinite updating
+    const timeoutId = setTimeout(() => {
+      console.log('Password update timeout reached');
+      setIsUpdating(false);
+      setMessage({ 
+        type: 'error', 
+        text: 'Password update timed out. Please try again.' 
+      });
+    }, 30000); // 30 second timeout
+
     try {
-      console.log('Starting password update process...');
+      console.log('Checking current session...');
       
-      // First, verify we have a valid session
+      // Get current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
         console.error('Session error:', sessionError);
-        setMessage({ 
-          type: 'error', 
-          text: 'Session error. Please sign out and sign back in.' 
-        });
-        return;
+        throw new Error('Session validation failed. Please sign out and sign back in.');
       }
 
       if (!session?.user) {
         console.error('No active session found');
-        setMessage({ 
-          type: 'error', 
-          text: 'No active session. Please sign out and sign back in.' 
-        });
-        return;
+        throw new Error('No active session found. Please sign out and sign back in.');
       }
 
-      console.log('Valid session found, attempting password update...');
+      console.log('Valid session found, updating password...');
       
-      // Attempt to update the password
-      const { data, error } = await supabase.auth.updateUser({
+      // Update password with explicit error handling
+      const updateResult = await supabase.auth.updateUser({
         password: newPassword
       });
 
       console.log('Password update result:', { 
-        success: !error, 
-        error: error?.message,
-        data: !!data 
+        success: !updateResult.error, 
+        error: updateResult.error?.message,
+        data: !!updateResult.data 
       });
 
-      if (error) {
-        console.error('Password update failed:', error);
+      // Clear timeout since we got a response
+      clearTimeout(timeoutId);
+
+      if (updateResult.error) {
+        console.error('Password update failed:', updateResult.error);
         
         // Handle specific error cases
         let errorMessage = 'Password update failed. ';
         
-        switch (error.message) {
+        switch (updateResult.error.message) {
           case 'New password should be different from the old password.':
             errorMessage = 'New password must be different from your current password.';
             break;
@@ -108,36 +117,44 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             errorMessage = 'User account not found. Please sign out and sign back in.';
             break;
           default:
-            errorMessage += error.message;
+            errorMessage += updateResult.error.message;
         }
         
         setMessage({ type: 'error', text: errorMessage });
       } else {
         console.log('Password updated successfully!');
         setMessage({ type: 'success', text: 'Password updated successfully!' });
+        
+        // Clear form
         setNewPassword('');
         setConfirmPassword('');
+        setShowNewPassword(false);
+        setShowConfirmPassword(false);
         
-        // Auto-clear success message after 3 seconds
+        // Auto-clear success message and close modal after 2 seconds
         setTimeout(() => {
           setMessage(null);
-        }, 3000);
+          onClose();
+        }, 2000);
       }
     } catch (error: any) {
-      console.error('Unexpected error during password update:', error);
+      console.error('Password update exception:', error);
       
-      // Check if it's a network error
+      // Clear timeout
+      clearTimeout(timeoutId);
+      
+      // Handle different types of errors
+      let errorMessage = 'An unexpected error occurred. ';
+      
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        setMessage({ 
-          type: 'error', 
-          text: 'Network error. Please check your connection and try again.' 
-        });
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: 'An unexpected error occurred. Please try again or contact support.' 
-        });
+        errorMessage += 'Please try again or contact support.';
       }
+      
+      setMessage({ type: 'error', text: errorMessage });
     } finally {
       console.log('Password update process completed');
       setIsUpdating(false);
@@ -175,7 +192,10 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
   const handleClose = () => {
     // Don't allow closing while updating
-    if (isUpdating) return;
+    if (isUpdating) {
+      console.log('Cannot close modal while password update is in progress');
+      return;
+    }
     
     setNewPassword('');
     setConfirmPassword('');
@@ -364,7 +384,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             {isUpdating && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
                 <p className="text-amber-700 text-xs text-center">
-                  ⏳ Please wait while we update your password...
+                  ⏳ Please wait while we update your password... (max 30 seconds)
                 </p>
               </div>
             )}
