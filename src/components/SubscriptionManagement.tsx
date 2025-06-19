@@ -46,7 +46,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
 
     setLoadingBilling(true);
     try {
-      // Try to load real billing history from database
+      // Load real billing history from database only - NO SAMPLE DATA
       const { data: realBillingData, error } = await supabase
         .from('billing_history')
         .select('*')
@@ -58,7 +58,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         console.error('Error loading billing history:', error);
         setBillingHistory([]);
       } else {
-        // Use real billing data only - no sample data
+        // Only use real data from database - no mock/sample data at all
         setBillingHistory(realBillingData || []);
       }
     } catch (error) {
@@ -190,6 +190,8 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         return 'text-amber-600';
       case 'failed':
         return 'text-red-600';
+      case 'refunded':
+        return 'text-purple-600';
       default:
         return 'text-gray-600';
     }
