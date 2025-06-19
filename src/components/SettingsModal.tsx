@@ -374,4 +374,3 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     </div>
   );
 }
-```
