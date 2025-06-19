@@ -7,26 +7,27 @@
 4. [Authentication & Authorization](#authentication--authorization)
 5. [Subscription System](#subscription-system)
 6. [Token System](#token-system)
-7. [Security & Audit System](#security--audit-system)
-8. [API Integration](#api-integration)
-9. [Component Structure](#component-structure)
-10. [State Management](#state-management)
-11. [Responsive Design](#responsive-design)
-12. [Deployment](#deployment)
-13. [Development Setup](#development-setup)
-14. [Testing](#testing)
-15. [Performance Considerations](#performance-considerations)
-16. [Security](#security)
-17. [Troubleshooting](#troubleshooting)
+7. [Tone Control System](#tone-control-system)
+8. [Security & Audit System](#security--audit-system)
+9. [API Integration](#api-integration)
+10. [Component Structure](#component-structure)
+11. [State Management](#state-management)
+12. [Responsive Design](#responsive-design)
+13. [Deployment](#deployment)
+14. [Development Setup](#development-setup)
+15. [Testing](#testing)
+16. [Performance Considerations](#performance-considerations)
+17. [Security](#security)
+18. [Troubleshooting](#troubleshooting)
 
 ## Project Overview
 
-TweakMyText is an AI-powered writing style rewriter application that analyzes user writing samples to learn their unique voice and tone, then transforms any input text to match that style. The application features a freemium subscription model with three tiers: Free, Pro, and Premium.
+TweakMyText is an AI-powered writing style rewriter application that analyzes user writing samples to learn their unique voice and tone, then transforms any input text to match that style. The application features a comprehensive freemium subscription model with three tiers: Free, Pro, and Premium.
 
 ### Key Features
 - **Writing Style Analysis**: AI-powered analysis of user writing samples with subscription-based analysis levels
 - **Text Rewriting**: Transform any text to match learned writing style with priority processing
-- **Tone Controls**: Subscription-gated adjustable parameters for formality, casualness, enthusiasm, and technicality
+- **Advanced Tone Controls**: 10 fine-tuning controls with subscription-gated access
 - **Subscription Tiers**: Free, Pro, and Premium with different feature sets and security controls
 - **Token System**: Usage-based billing with daily/monthly limits and comprehensive tracking
 - **Export Functionality**: Export results in multiple formats with subscription-based limits
@@ -54,6 +55,7 @@ TweakMyText is an AI-powered writing style rewriter application that analyzes us
 │   (Frontend)    │    │   (Backend)     │    │   (AI Service)  │
 │   + Responsive  │    │   + Security    │    │                 │
 │   + Session Mgmt│    │   + Audit Log   │    │                 │
+│   + Tone System │    │   + Billing     │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -61,15 +63,15 @@ TweakMyText is an AI-powered writing style rewriter application that analyzes us
 ```
 App
 ├── AuthModal
-├── SettingsModal
-├── PricingModal
+├── SettingsModal (with testing upgrade features)
+├── PricingModal (updated with tone control features)
 ├── UserMenu
 ├── StyleCapture (Responsive)
 │   └── WritingSample Management (with subscription limits)
 ├── TextRewriter (Responsive)
-│   ├── ToneControls (subscription-gated, responsive)
+│   ├── ToneControls (10 controls with subscription gating)
 │   └── ComparisonView (responsive)
-├── SubscriptionManagement
+├── SubscriptionManagement (real billing data only)
 ├── Security Layer (validation & logging)
 └── Session Management (sign-out handling)
 ```
@@ -157,7 +159,7 @@ CREATE TABLE security_audit_log (
 ```
 
 #### `billing_history` Table
-Billing and payment tracking.
+Billing and payment tracking (real data only, no sample data).
 
 ```sql
 CREATE TABLE billing_history (
@@ -196,16 +198,20 @@ Validates user subscription tier against required access level and logs attempts
 #### `check_tone_control_access()` 
 Specifically validates tone control access and logs security events.
 
+#### `handle_new_user()`
+Automatically creates user profile when new auth user is created.
+
 ## Authentication & Authorization
 
 ### Supabase Auth Integration with Session Management
 - Email/password authentication
 - No email confirmation required
-- Automatic user profile creation on signup
+- Automatic user profile creation on signup via trigger
 - JWT-based session management
 - **Enhanced**: Comprehensive security event logging for all auth actions
 - **Enhanced**: Proper session cleanup on sign-out
 - **Enhanced**: State management with sign-out detection
+- **Enhanced**: Session refresh functionality for password updates
 
 ### User Profile Management
 ```typescript
@@ -233,6 +239,7 @@ The `useAuth` hook provides:
 - **Enhanced**: Automatic security event logging for all user actions
 - **Enhanced**: Proper session state cleanup on sign-out
 - **Enhanced**: Sign-out state detection and UI updates
+- **Enhanced**: Session refresh and error handling
 
 ## Subscription System
 
@@ -246,7 +253,7 @@ The `useAuth` hook provides:
 | Monthly Exports | 5 | 200 | Unlimited |
 | Processing Speed | 1x | 2x | 3x |
 | Style Analysis | Basic | Advanced | Extended |
-| Tone Controls | **View-Only** | **Manual + Presets** | **Custom Fine-Tuning** |
+| **Tone Controls** | **View-Only (Auto-detected)** | **6 Controls + Presets** | **All 10 Controls + Custom Fine-Tuning** |
 | History Access | No | Yes | Yes |
 | Pricing | Free | $10/month | $18/month |
 
@@ -263,16 +270,18 @@ interface SubscriptionLimits {
   hasPriorityProcessing: boolean;
   processingPriority: 'standard' | 'priority' | 'premium';
   maxWritingSamples: number;
-  dailyTokenLimit: number;
-  monthlyTokenLimit: number;
+  dailyLimit: number;
+  monthlyLimit: number;
   exportLimit: number;
+  availableToneControls: string[];  // NEW: Which tone controls are available
+  maxToneControls: number;          // NEW: Maximum number of tone controls
 }
 ```
 
-#### Tone Control Access Matrix
-- **Free Tier**: View-only tone controls (auto-detected from samples)
-- **Pro Tier**: Manual tone adjustment + basic presets
-- **Premium Tier**: Full custom fine-tuning + advanced presets
+#### **NEW**: Tone Control Access Matrix
+- **Free Tier**: View-only tone controls (auto-detected from samples) - 0 modifiable controls
+- **Pro Tier**: 6 tone controls + basic presets (formality, casual, enthusiasm, technical, creativity, empathy)
+- **Premium Tier**: All 10 tone controls + advanced presets + custom fine-tuning (adds confidence, humor, urgency, clarity)
 
 #### Security Validation Functions
 ```typescript
@@ -284,13 +293,16 @@ validatePresetAccess(user: User | null, presetName: string): void
 
 // Validate tone settings modifications
 validateToneSettings(user: User | null, toneSettings: ToneSettings): void
+
+// NEW: Check available tone controls for user's tier
+getSubscriptionLimits(user: User | null): SubscriptionLimits
 ```
 
 ## Token System
 
 ### **Enhanced**: Token-Based Usage System
 
-The application has migrated from a credit-based system to a comprehensive token-based system for more granular usage tracking and better user experience.
+The application uses a comprehensive token-based system for granular usage tracking and better user experience.
 
 #### Token Allocation by Tier
 - **Free Tier**: 100,000 tokens/day, 1,000,000/month max (with daily limit enforcement)
@@ -341,6 +353,116 @@ The application uses intelligent token formatting for better user experience:
 - **Simplified**: Token deduction happens at user level only
 - **Improved**: Cleaner database schema with better performance
 
+## Tone Control System
+
+### **NEW**: Advanced Tone Control System
+
+The application features a sophisticated 10-control tone system with subscription-based access restrictions.
+
+#### Tone Control Structure
+```typescript
+interface ToneSettings {
+  // Pro Tier Controls (6 controls)
+  formality: number;     // 0-100: Casual ↔ Formal
+  casualness: number;    // 0-100: Reserved ↔ Friendly
+  enthusiasm: number;    // 0-100: Calm ↔ Energetic
+  technicality: number;  // 0-100: Simple ↔ Technical
+  creativity: number;    // 0-100: Conservative ↔ Creative
+  empathy: number;       // 0-100: Neutral ↔ Empathetic
+  
+  // Premium Tier Controls (4 additional controls)
+  confidence: number;    // 0-100: Humble ↔ Confident
+  humor: number;         // 0-100: Serious ↔ Playful
+  urgency: number;       // 0-100: Relaxed ↔ Urgent
+  clarity: number;       // 0-100: Complex ↔ Clear
+}
+```
+
+#### Subscription-Based Access Control
+
+##### **Free Tier (View-Only)**
+- **Access**: View-only, auto-detected tone settings
+- **Controls**: 0 modifiable controls
+- **Features**: Automatic tone detection from writing samples
+- **Restrictions**: Cannot modify any tone settings
+
+##### **Pro Tier (6 Controls + Presets)**
+- **Access**: 6 core tone controls + basic presets
+- **Controls**: formality, casualness, enthusiasm, technicality, creativity, empathy
+- **Features**: Manual tone adjustment + 4 basic presets
+- **Presets**: Professional, Friendly, Academic, Casual
+
+##### **Premium Tier (All 10 Controls + Advanced Features)**
+- **Access**: All 10 tone controls + advanced presets + custom fine-tuning
+- **Controls**: All Pro controls + confidence, humor, urgency, clarity
+- **Features**: Custom fine-tuning + 4 advanced presets
+- **Advanced Presets**: Executive, Creative, Technical, Persuasive
+
+#### Tone Control Security Implementation
+```typescript
+// Validate tone control access
+const validateToneAccess = (user: User | null, action: string): void => {
+  const limits = getSubscriptionLimits(user);
+  
+  switch (action) {
+    case 'modify_tone':
+      if (!limits.canModifyTone) {
+        throw new Error('Tone customization requires Pro or Premium subscription');
+      }
+      break;
+    case 'use_presets':
+      if (!limits.canUsePresets) {
+        throw new Error('Tone presets require Pro or Premium subscription');
+      }
+      break;
+    case 'use_advanced_presets':
+      if (!limits.canUseAdvancedPresets) {
+        throw new Error('Advanced tone presets require Premium subscription');
+      }
+      break;
+  }
+};
+
+// Validate specific tone control availability
+const validateToneSettings = (user: User | null, toneSettings: ToneSettings): void => {
+  const limits = getSubscriptionLimits(user);
+  
+  // Check if user is trying to use unavailable controls
+  const unavailableControls = Object.keys(toneSettings).filter(
+    control => !limits.availableToneControls.includes(control)
+  );
+  
+  if (unavailableControls.length > 0) {
+    const tierName = user?.subscription_tier === 'pro' ? 'Premium' : 'Pro or Premium';
+    throw new Error(`The following tone controls require ${tierName} subscription: ${unavailableControls.join(', ')}`);
+  }
+};
+```
+
+#### Tone Analysis with Subscription Levels
+```typescript
+// Secure tone analysis with subscription validation
+export const analyzeToneFromSamples = (samples: WritingSample[], user: User | null): ToneSettings => {
+  const limits = getSubscriptionLimits(user);
+  const analysisLevel = getAnalysisLevel(user);
+  
+  // Basic analysis for all users (auto-detection)
+  let toneSettings = performBasicAnalysis(samples);
+  
+  // Advanced analysis for Pro/Premium users
+  if (analysisLevel === 'advanced' || analysisLevel === 'extended') {
+    toneSettings = enhanceWithAdvancedAnalysis(toneSettings, samples);
+  }
+  
+  // Extended analysis for Premium users only
+  if (analysisLevel === 'extended') {
+    toneSettings = enhanceWithExtendedAnalysis(toneSettings, samples);
+  }
+  
+  return toneSettings;
+};
+```
+
 ## Security & Audit System
 
 ### **Enhanced**: Comprehensive Security Logging
@@ -349,8 +471,9 @@ The application uses intelligent token formatting for better user experience:
 - Authentication events (sign in/out, failures)
 - Token usage and limit violations
 - Export attempts and restrictions
-- Tone control access attempts
-- Subscription bypass attempts
+- **NEW**: Tone control access attempts and violations
+- **NEW**: Subscription bypass attempts for tone controls
+- **NEW**: Preset usage attempts
 - Rate limiting violations
 - Session management events
 
@@ -377,12 +500,19 @@ await validateAndLogToneAccess(user: User, action: string): Promise<boolean>
 await logSubscriptionBypassAttempt(user: User, action: string, requiredTier: string): Promise<void>
 ```
 
+#### **NEW**: Tone Control Security Events
+- `tone_control_access` - User attempts to modify tone controls
+- `preset_access_attempt` - User attempts to use presets
+- `advanced_preset_blocked` - Pro user attempts Premium presets
+- `tone_modification_blocked` - Free user attempts tone modification
+- `subscription_bypass_attempt` - User attempts to bypass subscription restrictions
+
 #### Rate Limiting
 - Built-in rate limiting for security-sensitive actions
 - Automatic logging of rate limit violations
 - Configurable limits per action type
 
-#### Access Control Matrix
+#### **NEW**: Access Control Matrix
 ```typescript
 // Tone Control Actions
 'modify_tone'          -> Requires Pro/Premium
@@ -391,12 +521,24 @@ await logSubscriptionBypassAttempt(user: User, action: string, requiredTier: str
 'advanced_analysis'    -> Requires Pro/Premium
 'extended_analysis'    -> Requires Premium
 'priority_processing'  -> Requires Pro/Premium
+
+// Tone Control Specific
+'formality'            -> Pro/Premium
+'casualness'           -> Pro/Premium
+'enthusiasm'           -> Pro/Premium
+'technicality'         -> Pro/Premium
+'creativity'           -> Pro/Premium
+'empathy'              -> Pro/Premium
+'confidence'           -> Premium Only
+'humor'                -> Premium Only
+'urgency'              -> Premium Only
+'clarity'              -> Premium Only
 ```
 
 ## API Integration
 
 ### **Enhanced**: Secure Claude API Integration
-Enhanced Claude API integration with subscription-based features.
+Enhanced Claude API integration with subscription-based features and tone control support.
 
 ```typescript
 const rewriteWithClaude = async (
@@ -410,14 +552,54 @@ const rewriteWithClaude = async (
 ```
 
 #### Analysis Levels
-- **Basic**: Free tier - fundamental style analysis
-- **Advanced**: Pro tier - detailed pattern analysis + tone consistency
-- **Extended**: Premium tier - comprehensive linguistic analysis + advanced features
+- **Basic**: Free tier - fundamental style analysis (no tone modification)
+- **Advanced**: Pro tier - detailed pattern analysis + 6 tone controls
+- **Extended**: Premium tier - comprehensive linguistic analysis + all 10 tone controls
 
 #### Processing Priority
 - **Standard (3)**: Free tier - standard processing speed
 - **Priority (2)**: Pro tier - 2x faster processing
 - **Premium (1)**: Premium tier - 3x faster processing + best model configuration
+
+#### **NEW**: Tone Control Integration
+```typescript
+const generateToneInstructions = (settings: ToneSettings, analysisLevel: string): string => {
+  const instructions: string[] = [];
+
+  // Basic tone instructions for all levels
+  if (settings.formality > 60) {
+    instructions.push(`- Use formal language and professional tone (${settings.formality}% formal)`);
+  }
+
+  // Advanced tone instructions for Pro/Premium
+  if (analysisLevel === 'advanced' || analysisLevel === 'extended') {
+    if (settings.creativity > 60) {
+      instructions.push(`- Use creative and innovative language (${settings.creativity}% creative)`);
+    }
+    if (settings.empathy > 60) {
+      instructions.push(`- Show understanding and empathy (${settings.empathy}% empathetic)`);
+    }
+  }
+
+  // Extended tone instructions for Premium only
+  if (analysisLevel === 'extended') {
+    if (settings.confidence > 60) {
+      instructions.push(`- Use confident and assertive language (${settings.confidence}% confident)`);
+    }
+    if (settings.humor > 60) {
+      instructions.push(`- Include appropriate humor and playfulness (${settings.humor}% humorous)`);
+    }
+    if (settings.urgency > 60) {
+      instructions.push(`- Convey urgency and time-sensitivity (${settings.urgency}% urgent)`);
+    }
+    if (settings.clarity > 60) {
+      instructions.push(`- Prioritize clarity and straightforward communication (${settings.clarity}% clear)`);
+    }
+  }
+
+  return instructions.length > 0 ? instructions.join('\n') : '- Maintain a balanced, natural tone';
+};
+```
 
 ### **Enhanced**: Secure Mock Implementation
 Fallback service with subscription-appropriate features and security validation.
@@ -454,16 +636,17 @@ const secureRewriteText = async (
 - **Enhanced**: Secure tone settings management
 - **Enhanced**: Audit trail for all rewrite operations
 
-#### `ToneControls.tsx`
-**Major Enhancement**: Responsive subscription-gated tone control interface:
-- **Enhanced**: Mobile-optimized slider controls
-- **Enhanced**: Responsive preset grids
-- **Enhanced**: Touch-friendly interaction areas
-- **Free Tier**: View-only controls with upgrade prompts
-- **Pro Tier**: Manual adjustment + basic presets
-- **Premium Tier**: Full customization + advanced presets
-- **Enhanced**: Real-time subscription validation
-- **Enhanced**: Security logging for all access attempts
+#### **NEW**: `ToneControls.tsx`
+**Major Enhancement**: Advanced tone control interface with subscription gating:
+- **Enhanced**: 10 comprehensive tone controls with subscription-based access
+- **Enhanced**: Mobile-optimized slider controls with touch-friendly interaction
+- **Enhanced**: Responsive preset grids (basic + advanced)
+- **Free Tier**: View-only controls with clear upgrade prompts
+- **Pro Tier**: 6 controls + basic presets (Professional, Friendly, Academic, Casual)
+- **Premium Tier**: All 10 controls + advanced presets (Executive, Creative, Technical, Persuasive)
+- **Enhanced**: Real-time subscription validation with security logging
+- **Enhanced**: Visual indicators for locked/available controls
+- **Enhanced**: Responsive design with adaptive layouts
 
 #### `StyleCapture.tsx`
 **Major Enhancement**: Responsive writing sample management:
@@ -486,24 +669,35 @@ const secureRewriteText = async (
 - **Enhanced**: Real-time token remaining display
 - **Enhanced**: Responsive design for all screen sizes
 
-#### `PricingModal.tsx`
-**Enhanced**: Updated pricing with token system:
-- **Enhanced**: Token-based pricing display
-- **Enhanced**: Clear feature differentiation
-- **Enhanced**: Updated pricing ($10 Pro, $18 Premium)
-- **Enhanced**: Token formatting throughout
+#### **NEW**: `PricingModal.tsx`
+**Enhanced**: Updated pricing with tone control features:
+- **Enhanced**: Tone control feature highlighting
+- **Enhanced**: Clear differentiation between tier capabilities
+- **Enhanced**: Updated feature descriptions:
+  - Free: "View-only tone controls (auto-detected)"
+  - Pro: "6 core tone controls + presets"
+  - Premium: "All 10 tone controls + custom fine-tuning"
+- **Enhanced**: Feature comparison section with tone control details
+
+#### **NEW**: `SettingsModal.tsx`
+**Enhanced**: Settings with testing upgrade functionality:
+- **Enhanced**: Testing mode upgrade buttons for Pro/Premium
+- **Enhanced**: Improved password update with session refresh
+- **Enhanced**: Better error handling and user feedback
+- **Enhanced**: Subscription tier display with visual indicators
 
 #### `SubscriptionManagement.tsx`
-**Enhanced**: Token-based subscription management:
+**Enhanced**: Real billing data integration:
+- **Enhanced**: Removed all sample/mock billing data
+- **Enhanced**: Real database integration only
 - **Enhanced**: Token usage statistics and progress bars
-- **Enhanced**: Real billing data integration
 - **Enhanced**: Token formatting and display
 - **Enhanced**: Responsive design for all screen sizes
 
 #### **Enhanced**: Security Validation Layer
-- `subscriptionValidator.ts`: Centralized subscription validation with token limits
+- `subscriptionValidator.ts`: Enhanced with tone control validation
 - `securityLogger.ts`: Comprehensive security event logging
-- `secureStyleAnalyzer.ts`: Subscription-aware style analysis
+- `secureStyleAnalyzer.ts`: Subscription-aware style analysis with tone controls
 
 ### Modal Components
 
@@ -512,12 +706,6 @@ Authentication interface with security logging:
 - Sign in/up forms with failure logging
 - Error handling with security events
 - Welcome messaging
-
-#### `SettingsModal.tsx`
-User settings management:
-- Password updates (with security logging)
-- Account information
-- Subscription management links
 
 ## State Management
 
@@ -528,6 +716,7 @@ User settings management:
 - **Enhanced**: Session state management with sign-out detection
 - **Enhanced**: Automatic state cleanup on sign-out
 - **Enhanced**: Token usage state management
+- **NEW**: Tone control state management with subscription validation
 - Form state management with validation
 - UI state (modals, loading, errors, security alerts)
 
@@ -538,14 +727,16 @@ User settings management:
 - **Enhanced**: Security event tracking
 - **Enhanced**: Session state cleanup on sign-out
 - **Enhanced**: Token usage tracking and display
+- **NEW**: Tone control state with subscription-based restrictions
 
 ### Data Persistence with Audit Trails
 - Writing samples: Supabase database (with access logging)
 - User preferences: Local storage
 - Session state: Supabase Auth (with security events and cleanup)
 - **Enhanced**: Security audit logs: Permanent database storage
-- **Enhanced**: Billing history: Real Supabase integration
+- **Enhanced**: Billing history: Real Supabase integration (no sample data)
 - **Enhanced**: Token usage: Real-time tracking
+- **NEW**: Tone control preferences: Subscription-validated storage
 
 ## Responsive Design
 
@@ -579,10 +770,12 @@ User settings management:
 - **Desktop**: Full multi-column layouts with enhanced spacing
 - **Enhanced**: Token usage display adapts to screen size
 
-##### **ToneControls Component**
-- **Mobile**: Stacked preset grids, touch-optimized sliders
-- **Tablet**: Balanced grid layouts
-- **Desktop**: Full grid layouts with optimal spacing
+##### **NEW**: **ToneControls Component**
+- **Mobile**: Stacked control layout, touch-optimized sliders, compact preset grids
+- **Tablet**: Balanced grid layouts with proper spacing
+- **Desktop**: Full grid layouts with optimal spacing and visual hierarchy
+- **Enhanced**: Responsive locked/available control indicators
+- **Enhanced**: Adaptive preset button sizing
 
 ##### **ComparisonView Component**
 - **Mobile**: Vertical layout with rotated arrow indicator
@@ -618,7 +811,7 @@ mb-4 sm:mb-6 lg:mb-8                /* Margins */
 - **Primary Platform**: Netlify
 - **Live URL**: https://tweakmytext.netlify.app
 - **Build Process**: Automated via Netlify
-- **Environment**: Production-ready with security features and responsive design
+- **Environment**: Production-ready with security features, responsive design, and tone controls
 
 ### Environment Variables
 ```bash
@@ -648,6 +841,7 @@ npm run build
 - All security policies enabled
 - Responsive design optimized for all devices
 - Token system fully operational
+- **NEW**: Tone control access restrictions enforced
 
 ## Development Setup
 
@@ -674,7 +868,7 @@ cp .env.example .env
 npm run dev
 ```
 
-### **Enhanced**: Database Setup with Security and Token System
+### **Enhanced**: Database Setup with Security, Token System, and Tone Controls
 1. Create Supabase project
 2. Run migrations in order:
    - `20250610021118_lucky_trail.sql` (users table)
@@ -689,6 +883,7 @@ npm run dev
    - `20250618005630_heavy_disk.sql` (billing history)
    - `20250618020049_crimson_spark.sql` (token system migration)
    - `20250618021548_bold_island.sql` (remove credits_used column)
+   - `20250619013507_bright_sound.sql` (auth fixes and user profile creation)
 
 ### Development Commands
 ```bash
@@ -697,6 +892,13 @@ npm run build        # Build for production
 npm run preview      # Preview production build
 npm run lint         # Run ESLint
 ```
+
+### **NEW**: Testing Subscription Tiers
+The application includes testing functionality to upgrade accounts:
+1. Sign in as a free user
+2. Go to Settings modal
+3. Use "Upgrade to Pro" or "Upgrade to Premium" buttons
+4. Test tone control access for different tiers
 
 ## Testing
 
@@ -707,6 +909,8 @@ npm run lint         # Run ESLint
 - **Enhanced**: Responsive design testing
 - **Enhanced**: Session management testing
 - **Enhanced**: Token system testing
+- **NEW**: Tone control access testing
+- **NEW**: Preset usage validation testing
 - Integration testing for user flows with security
 - Database testing with Supabase local development
 - API testing with mock services
@@ -722,17 +926,28 @@ src/
 │   ├── security/          # Security testing
 │   ├── responsive/        # Responsive design testing
 │   ├── tokens/            # Token system testing
+│   ├── toneControls/      # NEW: Tone control testing
 │   └── integration/
 ```
 
 ### **Enhanced**: Security Test Cases
 - Subscription tier validation
-- Tone control access restrictions
+- **NEW**: Tone control access restrictions
+- **NEW**: Preset usage validation
 - Token limit enforcement
 - Export limit validation
 - Security event logging
 - Rate limiting functionality
 - Session management and cleanup
+
+### **NEW**: Tone Control Test Cases
+- Free tier view-only access
+- Pro tier 6-control access
+- Premium tier 10-control access
+- Preset access validation
+- Advanced preset restrictions
+- Tone setting validation
+- Security event logging for tone access
 
 ### **Enhanced**: Token System Test Cases
 - Token usage estimation accuracy
@@ -747,6 +962,7 @@ src/
 - Typography scaling tests
 - Breakpoint behavior validation
 - Cross-device compatibility
+- **NEW**: Tone control responsive behavior
 
 ## Performance Considerations
 
@@ -759,6 +975,7 @@ src/
 - **Enhanced**: Security event batching for performance
 - **Enhanced**: Responsive image optimization
 - **Enhanced**: Token calculation optimization
+- **NEW**: Tone control state optimization
 
 ### Performance Monitoring with Security
 - Bundle size analysis
@@ -768,6 +985,7 @@ src/
 - **Enhanced**: Security event processing performance
 - **Enhanced**: Responsive design performance metrics
 - **Enhanced**: Token calculation performance
+- **NEW**: Tone control rendering performance
 
 ### **Enhanced**: Security-Aware Caching Strategy
 - Browser caching for static assets
@@ -777,6 +995,7 @@ src/
 - **Enhanced**: Subscription validation result caching
 - **Enhanced**: Responsive asset caching
 - **Enhanced**: Token usage calculation caching
+- **NEW**: Tone control state caching
 
 ## Security
 
@@ -792,6 +1011,7 @@ src/
 - **Enhanced**: Security event monitoring
 - **Enhanced**: Session security with proper cleanup
 - **Enhanced**: Token usage validation and limits
+- **NEW**: Tone control access restrictions and validation
 
 ### **Enhanced**: Data Protection with Audit Trails
 - **Encryption**: Data encrypted at rest and in transit
@@ -802,6 +1022,7 @@ src/
 - **Enhanced**: Subscription bypass prevention
 - **Enhanced**: Session data protection
 - **Enhanced**: Token usage audit trails
+- **NEW**: Tone control access audit trails
 
 ### **Enhanced**: API Security with Subscription Validation
 - **Rate Limiting**: Prevent API abuse (with logging)
@@ -811,18 +1032,20 @@ src/
 - **Enhanced**: Subscription tier enforcement
 - **Enhanced**: Security event correlation
 - **Enhanced**: Token usage validation
+- **NEW**: Tone control access validation
 
 ### **Enhanced**: Subscription Security Model
 ```typescript
 // Security validation flow
 1. User attempts action
 2. Validate subscription tier
-3. Check token availability
-4. Log security event
-5. Allow/deny with audit trail
-6. Monitor for bypass attempts
-7. Rate limit suspicious activity
-8. Handle session security
+3. Check specific feature access (e.g., tone controls)
+4. Validate token availability
+5. Log security event
+6. Allow/deny with audit trail
+7. Monitor for bypass attempts
+8. Rate limit suspicious activity
+9. Handle session security
 ```
 
 ## Troubleshooting
@@ -834,6 +1057,7 @@ src/
 // Check subscription validation
 const limits = getSubscriptionLimits(user);
 console.log('User limits:', limits);
+console.log('Available tone controls:', limits.availableToneControls);
 
 // Verify security events
 const events = await supabase
@@ -844,7 +1068,7 @@ const events = await supabase
   .limit(10);
 ```
 
-#### Tone Control Access Issues
+#### **NEW**: Tone Control Access Issues
 ```typescript
 // Debug tone control access
 try {
@@ -854,7 +1078,12 @@ try {
   console.log('Tone access denied:', error.message);
 }
 
-// Check security audit logs
+// Check available controls for user's tier
+const limits = getSubscriptionLimits(user);
+console.log('Available tone controls:', limits.availableToneControls);
+console.log('Max tone controls:', limits.maxToneControls);
+
+// Check tone control security events
 const toneEvents = await supabase
   .from('security_audit_log')
   .select('*')
@@ -893,6 +1122,10 @@ console.log('Current session:', session);
 // Check for proper state cleanup
 console.log('User state after sign-out:', user);
 console.log('Current view after sign-out:', currentView);
+
+// Test session refresh
+const { data, error } = await supabase.auth.refreshSession();
+console.log('Session refresh result:', { data: !!data, error });
 ```
 
 #### **Enhanced**: Responsive Design Issues
@@ -942,7 +1175,7 @@ SELECT auth.uid(), auth.role();
 -- Check security audit log access
 SELECT * FROM security_audit_log WHERE user_id = auth.uid() LIMIT 5;
 
--- Check billing history access
+-- Check billing history access (should show real data only)
 SELECT * FROM billing_history WHERE user_id = auth.uid() LIMIT 5;
 
 -- Check token system migration
@@ -952,6 +1185,10 @@ FROM users WHERE id = auth.uid();
 -- Verify rewrite_history table structure (credits_used should be removed)
 SELECT column_name FROM information_schema.columns 
 WHERE table_name = 'rewrite_history';
+
+-- Check user profile creation trigger
+SELECT * FROM information_schema.triggers 
+WHERE trigger_name = 'on_auth_user_created';
 ```
 
 #### **Enhanced**: API Integration Issues with Security
@@ -961,9 +1198,11 @@ const testSecureClaudeAPI = async () => {
   try {
     const analysisLevel = getAnalysisLevel(user);
     const processingPriority = getProcessingPriority(user);
+    const limits = getSubscriptionLimits(user);
     
     console.log('Analysis level:', analysisLevel);
     console.log('Processing priority:', processingPriority);
+    console.log('Available tone controls:', limits.availableToneControls);
     
     const response = await rewriteWithClaude(
       'test text', 
@@ -980,6 +1219,31 @@ const testSecureClaudeAPI = async () => {
 };
 ```
 
+#### **NEW**: Tone Control Issues
+```typescript
+// Debug tone control state
+const debugToneControls = () => {
+  const limits = getSubscriptionLimits(user);
+  
+  console.log('User subscription tier:', user?.subscription_tier);
+  console.log('Can modify tone:', limits.canModifyTone);
+  console.log('Can use presets:', limits.canUsePresets);
+  console.log('Can use advanced presets:', limits.canUseAdvancedPresets);
+  console.log('Available controls:', limits.availableToneControls);
+  console.log('Max controls:', limits.maxToneControls);
+};
+
+// Test tone setting validation
+const testToneValidation = (toneSettings: ToneSettings) => {
+  try {
+    validateToneSettings(user, toneSettings);
+    console.log('Tone settings valid');
+  } catch (error) {
+    console.error('Tone validation failed:', error.message);
+  }
+};
+```
+
 #### **Enhanced**: Responsive Design Issues
 ```typescript
 // Debug responsive behavior
@@ -992,6 +1256,21 @@ const checkResponsive = () => {
 
 // Check touch device
 console.log('Touch device:', 'ontouchstart' in window);
+
+// Test tone control responsive behavior
+const checkToneControlResponsive = () => {
+  const toneControls = document.querySelectorAll('[data-tone-control]');
+  console.log('Tone controls found:', toneControls.length);
+  
+  toneControls.forEach((control, index) => {
+    const rect = control.getBoundingClientRect();
+    console.log(`Control ${index}:`, {
+      width: rect.width,
+      height: rect.height,
+      touchFriendly: rect.height >= 44
+    });
+  });
+};
 ```
 
 ### **Enhanced**: Debug Mode with Security
@@ -1003,6 +1282,7 @@ VITE_DEBUG=true
 ### **Enhanced**: Security Monitoring
 - Real-time security event tracking
 - Subscription bypass attempt detection
+- **NEW**: Tone control access violation monitoring
 - Rate limiting violation monitoring
 - Audit log analysis tools
 - Session security monitoring
@@ -1013,13 +1293,14 @@ VITE_DEBUG=true
 ### Development Workflow
 1. Create feature branch
 2. Implement changes with security considerations
-3. Add tests (including security, responsive, and token tests)
+3. Add tests (including security, responsive, tone control, and token tests)
 4. Update documentation
 5. **Enhanced**: Verify security audit logging
 6. **Enhanced**: Test responsive design across devices
 7. **Enhanced**: Verify session management
 8. **Enhanced**: Test token system functionality
-9. Submit pull request
+9. **NEW**: Test tone control access restrictions
+10. Submit pull request
 
 ### **Enhanced**: Security Code Standards
 - TypeScript strict mode
@@ -1031,10 +1312,11 @@ VITE_DEBUG=true
 - **Enhanced**: Input validation and sanitization
 - **Enhanced**: Responsive design standards
 - **Enhanced**: Token system validation
+- **NEW**: Tone control access validation
 
 ### **Enhanced**: Security Review Process
 - Code review required (including security review)
-- Test coverage maintained (including security, responsive, and token tests)
+- Test coverage maintained (including security, responsive, tone control, and token tests)
 - Documentation updated (including security implications)
 - Performance impact assessed (including security overhead)
 - **Enhanced**: Security audit log verification
@@ -1042,6 +1324,7 @@ VITE_DEBUG=true
 - **Enhanced**: Responsive design validation
 - **Enhanced**: Session management testing
 - **Enhanced**: Token system validation
+- **NEW**: Tone control access testing
 
 ---
 
@@ -1053,8 +1336,16 @@ VITE_DEBUG=true
 - `token_usage_attempt` / `token_limit_exceeded` / `tokens_used`
 - `daily_token_limit_exceeded` / `monthly_token_limit_exceeded`
 - `export_attempt` / `export_limit_exceeded` / `export_successful` / `export_unlimited`
-- `tone_control_access` / `subscription_bypass_attempt`
+- **NEW**: `tone_control_access` / `preset_access_attempt` / `advanced_preset_blocked`
+- **NEW**: `tone_modification_blocked` / `subscription_bypass_attempt`
 - `rate_limit_violation`
+
+### **NEW**: Tone Control Event Types
+- `modify_tone` - User attempts to modify tone settings
+- `use_presets` - User attempts to use basic presets
+- `use_advanced_presets` - User attempts to use advanced presets
+- `tone_control_locked` - User attempts to use locked controls
+- `preset_blocked` - User attempts to use unavailable presets
 
 ### Database Migration History
 - **v1**: Initial schema (users, writing_samples, rewrite_history)
@@ -1066,11 +1357,12 @@ VITE_DEBUG=true
 - **v7**: Billing history integration
 - **v8**: Token system migration and implementation
 - **v9**: Remove obsolete credits_used column
+- **v10**: Auth fixes and user profile creation trigger
 
 ### **Enhanced**: Security Architecture
-- **Frontend**: Subscription validation + security error handling + session management + token tracking
-- **Backend**: Database functions + audit logging + RLS policies + billing integration + token management
-- **API**: Secure Claude integration + subscription-aware processing + token usage tracking
+- **Frontend**: Subscription validation + security error handling + session management + token tracking + tone control access
+- **Backend**: Database functions + audit logging + RLS policies + billing integration + token management + tone control validation
+- **API**: Secure Claude integration + subscription-aware processing + token usage tracking + tone control support
 
 ### **Enhanced**: Responsive Design Architecture
 - **Mobile-First**: All components start with mobile design
@@ -1078,10 +1370,18 @@ VITE_DEBUG=true
 - **Touch-Optimized**: All interactions work on touch devices
 - **Flexible Layouts**: Components adapt to any screen size
 - **Token Display**: Responsive token formatting and display
+- **NEW**: Tone Control Responsive: Touch-friendly sliders and controls
+
+### **NEW**: Tone Control Architecture
+- **Subscription-Based Access**: Controls available based on user tier
+- **Security Validation**: All tone modifications validated and logged
+- **Responsive Design**: Touch-friendly controls across all devices
+- **Progressive Enhancement**: More controls available with higher tiers
+- **Real-time Validation**: Immediate feedback on access restrictions
 
 ### API Endpoints
 - **Supabase**: Database operations, authentication, security logging, billing, token management
-- **Claude API**: Text rewriting service (subscription-aware with token tracking)
+- **Claude API**: Text rewriting service (subscription-aware with token tracking and tone control support)
 - **Netlify**: Deployment and hosting
 
 ### External Dependencies
@@ -1098,6 +1398,7 @@ VITE_DEBUG=true
 - Access control matrix
 - Session management system
 - Token usage tracking system
+- **NEW**: Tone control access validation system
 
 ### Performance Benchmarks
 - **Initial Load**: < 2s
@@ -1107,6 +1408,7 @@ VITE_DEBUG=true
 - **Enhanced**: Security Event Logging: < 100ms overhead
 - **Enhanced**: Responsive Layout Shift: < 0.1 CLS
 - **Enhanced**: Token Calculation: < 10ms
+- **NEW**: Tone Control Rendering: < 50ms
 
 ### **Enhanced**: Security Metrics
 - **Subscription Validation**: < 50ms
@@ -1115,6 +1417,7 @@ VITE_DEBUG=true
 - **Access Control Validation**: < 25ms
 - **Session Validation**: < 30ms
 - **Token Usage Calculation**: < 15ms
+- **NEW**: Tone Control Validation: < 20ms
 
 ### **Enhanced**: Responsive Design Metrics
 - **Mobile Performance**: 90+ Lighthouse score
@@ -1122,6 +1425,7 @@ VITE_DEBUG=true
 - **Font Readability**: 16px minimum on mobile
 - **Layout Shift**: < 0.1 CLS across all breakpoints
 - **Token Display**: Readable on all screen sizes
+- **NEW**: Tone Control Touch Targets: 44px minimum
 
 ### **Enhanced**: Token System Metrics
 - **Token Estimation Accuracy**: ±5% of actual usage
@@ -1129,4 +1433,10 @@ VITE_DEBUG=true
 - **Usage Tracking Latency**: < 50ms
 - **Reset Function Performance**: < 200ms
 
-This documentation provides a comprehensive overview of the TweakMyText application architecture, implementation details, security features, responsive design system, session management, token system, and operational procedures for developers working on the project.
+### **NEW**: Tone Control System Metrics
+- **Control Rendering Performance**: < 50ms
+- **Validation Response Time**: < 20ms
+- **Preset Application Speed**: < 30ms
+- **Security Event Logging**: < 15ms per control access
+
+This documentation provides a comprehensive overview of the TweakMyText application architecture, implementation details, security features, responsive design system, session management, token system, advanced tone control system, and operational procedures for developers working on the project.
