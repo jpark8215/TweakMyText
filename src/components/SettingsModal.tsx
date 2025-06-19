@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown, RefreshCw } from 'lucide-react';
+import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown, RefreshCw, LogOut } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -17,7 +17,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   if (!isOpen || !user) return null;
 
@@ -52,20 +52,9 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     setIsUpdating(true);
     setMessage({ type: 'info', text: 'Updating your password...' });
 
-    // Set a timeout to prevent infinite updating
-    const timeoutId = setTimeout(() => {
-      console.log('Password update timeout reached');
-      setIsUpdating(false);
-      setMessage({ 
-        type: 'error', 
-        text: 'Password update timed out. Please try again.' 
-      });
-    }, 30000); // 30 second timeout
-
     try {
-      console.log('Checking current session...');
-      
-      // Get current session
+      // First, verify we have a valid session
+      console.log('Verifying session...');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -78,21 +67,27 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
         throw new Error('No active session found. Please sign out and sign back in.');
       }
 
-      console.log('Valid session found, updating password...');
+      console.log('Valid session found, attempting password update...');
       
-      // Update password with explicit error handling
-      const updateResult = await supabase.auth.updateUser({
+      // Use a Promise.race to implement timeout
+      const updatePromise = supabase.auth.updateUser({
         password: newPassword
       });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Password update timed out after 15 seconds'));
+        }, 15000);
+      });
+
+      // Race between update and timeout
+      const updateResult = await Promise.race([updatePromise, timeoutPromise]) as any;
 
       console.log('Password update result:', { 
         success: !updateResult.error, 
         error: updateResult.error?.message,
         data: !!updateResult.data 
       });
-
-      // Clear timeout since we got a response
-      clearTimeout(timeoutId);
 
       if (updateResult.error) {
         console.error('Password update failed:', updateResult.error);
@@ -115,6 +110,9 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             break;
           case 'User not found':
             errorMessage = 'User account not found. Please sign out and sign back in.';
+            break;
+          case 'JWT expired':
+            errorMessage = 'Session expired. Please sign out and sign back in.';
             break;
           default:
             errorMessage += updateResult.error.message;
@@ -140,14 +138,15 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     } catch (error: any) {
       console.error('Password update exception:', error);
       
-      // Clear timeout
-      clearTimeout(timeoutId);
-      
       // Handle different types of errors
-      let errorMessage = 'An unexpected error occurred. ';
+      let errorMessage = 'Password update failed. ';
       
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      if (error.message === 'Password update timed out after 15 seconds') {
+        errorMessage = 'Password update timed out. This might be a temporary issue. Please try signing out and back in, then try again.';
+      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
         errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message.includes('JWT') || error.message.includes('session')) {
+        errorMessage = 'Session expired. Please sign out and sign back in.';
       } else if (error.message) {
         errorMessage = error.message;
       } else {
@@ -187,6 +186,17 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
         type: 'error', 
         text: 'Failed to refresh session. Please sign out and sign back in.' 
       });
+    }
+  };
+
+  const handleSignOutAndRestart = async () => {
+    try {
+      setMessage({ type: 'info', text: 'Signing out...' });
+      await signOut();
+      onClose();
+    } catch (error) {
+      console.error('Sign out error:', error);
+      setMessage({ type: 'error', text: 'Failed to sign out. Please refresh the page.' });
     }
   };
 
@@ -261,15 +271,26 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
         <form onSubmit={handlePasswordUpdate} className="space-y-3 sm:space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-gray-800 font-medium text-sm sm:text-base">Change Password</h3>
-            <button
-              type="button"
-              onClick={handleRefreshSession}
-              disabled={isUpdating}
-              className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2 py-1 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              <RefreshCw className="w-3 h-3" />
-              Refresh Session
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleRefreshSession}
+                disabled={isUpdating}
+                className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2 py-1 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOutAndRestart}
+                disabled={isUpdating}
+                className="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg px-2 py-1 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                <LogOut className="w-3 h-3" />
+                Sign Out
+              </button>
+            </div>
           </div>
           
           <div>
@@ -378,13 +399,13 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
               <p className="text-blue-700 text-xs text-center">
-                💡 If you're having issues, try refreshing your session first
+                💡 If you're having timeout issues, try refreshing your session or signing out and back in
               </p>
             </div>
             {isUpdating && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
                 <p className="text-amber-700 text-xs text-center">
-                  ⏳ Please wait while we update your password... (max 30 seconds)
+                  ⏳ Please wait while we update your password... (max 15 seconds)
                 </p>
               </div>
             )}
