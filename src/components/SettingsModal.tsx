@@ -10,10 +10,8 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ isOpen, onClose, onManageSubscription }: SettingsModalProps) {
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -27,8 +25,9 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     e.preventDefault();
     setMessage(null);
 
-    if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: 'New passwords do not match' });
+    // Validation
+    if (!newPassword.trim()) {
+      setMessage({ type: 'error', text: 'Please enter a new password' });
       return;
     }
 
@@ -37,33 +36,59 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
       return;
     }
 
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: 'error', text: 'Passwords do not match' });
+      return;
+    }
+
     setIsUpdating(true);
 
     try {
+      // Update password using Supabase Auth
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (error) {
-        setMessage({ type: 'error', text: error.message });
+        console.error('Password update error:', error);
+        
+        // Handle specific error cases
+        if (error.message.includes('same_password')) {
+          setMessage({ type: 'error', text: 'New password must be different from your current password' });
+        } else if (error.message.includes('weak_password')) {
+          setMessage({ type: 'error', text: 'Password is too weak. Please choose a stronger password' });
+        } else if (error.message.includes('signup_disabled')) {
+          setMessage({ type: 'error', text: 'Password updates are currently disabled' });
+        } else {
+          setMessage({ type: 'error', text: error.message || 'Failed to update password' });
+        }
       } else {
-        setMessage({ type: 'success', text: 'Password updated successfully' });
-        setCurrentPassword('');
+        setMessage({ type: 'success', text: 'Password updated successfully!' });
         setNewPassword('');
         setConfirmPassword('');
+        
+        // Auto-close success message after 3 seconds
+        setTimeout(() => {
+          setMessage(null);
+        }, 3000);
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'An unexpected error occurred' });
+    } catch (error: any) {
+      console.error('Unexpected error during password update:', error);
+      setMessage({ 
+        type: 'error', 
+        text: 'An unexpected error occurred. Please try again.' 
+      });
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleClose = () => {
-    setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
     setMessage(null);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
     onClose();
   };
 
@@ -116,30 +141,6 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
           
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-              Current Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-              <input
-                type={showCurrentPassword ? 'text' : 'password'}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base"
-                placeholder="Enter current password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                {showCurrentPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
               New Password
             </label>
             <div className="relative">
@@ -152,6 +153,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 placeholder="Enter new password"
                 required
                 minLength={6}
+                autoComplete="new-password"
               />
               <button
                 type="button"
@@ -161,6 +163,9 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 {showNewPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             </div>
+            {newPassword && newPassword.length < 6 && (
+              <p className="text-xs text-amber-600 mt-1">Password must be at least 6 characters</p>
+            )}
           </div>
 
           <div>
@@ -177,6 +182,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 placeholder="Confirm new password"
                 required
                 minLength={6}
+                autoComplete="new-password"
               />
               <button
                 type="button"
@@ -186,6 +192,9 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 {showConfirmPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             </div>
+            {confirmPassword && newPassword && confirmPassword !== newPassword && (
+              <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
+            )}
           </div>
 
           {message && (
@@ -207,17 +216,31 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
           <button
             type="submit"
-            disabled={isUpdating || !currentPassword || !newPassword || !confirmPassword}
+            disabled={isUpdating || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 6}
             className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
           >
-            {isUpdating ? 'Updating Password...' : 'Update Password'}
+            {isUpdating ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Updating Password...
+              </div>
+            ) : (
+              'Update Password'
+            )}
           </button>
         </form>
 
         <div className="mt-4 sm:mt-6 pt-3 sm:pt-6 border-t border-gray-200">
-          <p className="text-gray-500 text-xs text-center">
-            Password changes take effect immediately. You will remain signed in.
-          </p>
+          <div className="space-y-2">
+            <p className="text-gray-500 text-xs text-center">
+              Password changes take effect immediately. You will remain signed in.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+              <p className="text-blue-700 text-xs text-center">
+                💡 Choose a strong password with at least 6 characters
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
