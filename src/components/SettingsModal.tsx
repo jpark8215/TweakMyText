@@ -384,7 +384,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             {isUpdating && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
                 <p className="text-amber-700 text-xs text-center">
-                  ⏳ Please wait while we update your password... (max 30 seconds)
+                  ⏳ Please wait while we update your password (max 30 seconds)
                 </p>
               </div>
             )}
