@@ -50,33 +50,49 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     try {
       console.log('Starting password update...');
       
-      // Use a timeout to prevent infinite hanging
-      const updatePromise = supabase.auth.updateUser({
+      // First, check if we have a valid session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error('No valid session found:', sessionError);
+        setMessage({ 
+          type: 'error', 
+          text: 'Your session has expired. Please sign out and sign back in.' 
+        });
+        return;
+      }
+
+      console.log('Valid session found, updating password...');
+      
+      // Update password with proper error handling
+      const { data, error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Password update timed out')), 10000); // 10 second timeout
-      });
-
-      const { error } = await Promise.race([updatePromise, timeoutPromise]) as any;
-
-      console.log('Password update completed, error:', error);
+      console.log('Password update response:', { data, error });
 
       if (error) {
         console.error('Password update error:', error);
         
-        // Handle specific error cases
-        if (error.message?.includes('same_password')) {
-          setMessage({ type: 'error', text: 'New password must be different from your current password' });
-        } else if (error.message?.includes('weak_password')) {
-          setMessage({ type: 'error', text: 'Password is too weak. Please choose a stronger password' });
-        } else if (error.message?.includes('signup_disabled')) {
-          setMessage({ type: 'error', text: 'Password updates are currently disabled' });
-        } else if (error.message?.includes('timeout')) {
-          setMessage({ type: 'error', text: 'Password update timed out. Please try again' });
-        } else {
-          setMessage({ type: 'error', text: error.message || 'Failed to update password. Please try again.' });
+        // Handle specific Supabase error cases
+        switch (error.message) {
+          case 'New password should be different from the old password.':
+            setMessage({ type: 'error', text: 'New password must be different from your current password' });
+            break;
+          case 'Password should be at least 6 characters.':
+            setMessage({ type: 'error', text: 'Password must be at least 6 characters long' });
+            break;
+          case 'Unable to validate email address: invalid format':
+            setMessage({ type: 'error', text: 'There was an issue with your account. Please contact support.' });
+            break;
+          case 'Invalid login credentials':
+            setMessage({ type: 'error', text: 'Authentication failed. Please sign out and sign back in.' });
+            break;
+          default:
+            setMessage({ 
+              type: 'error', 
+              text: `Password update failed: ${error.message}` 
+            });
         }
       } else {
         console.log('Password updated successfully');
@@ -91,18 +107,10 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
       }
     } catch (error: any) {
       console.error('Unexpected error during password update:', error);
-      
-      if (error.message?.includes('timeout')) {
-        setMessage({ 
-          type: 'error', 
-          text: 'Password update timed out. Please check your connection and try again.' 
-        });
-      } else {
-        setMessage({ 
-          type: 'error', 
-          text: 'An unexpected error occurred. Please try again.' 
-        });
-      }
+      setMessage({ 
+        type: 'error', 
+        text: 'An unexpected error occurred. Please try signing out and back in.' 
+      });
     } finally {
       console.log('Setting isUpdating to false');
       setIsUpdating(false);

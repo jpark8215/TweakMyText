@@ -21,6 +21,8 @@ export const useAuth = () => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.id);
+        
         if (session?.user) {
           await fetchUserProfile(session.user);
           
@@ -136,49 +138,61 @@ export const useAuth = () => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (error) {
-      // Log failed sign-in attempt
-      await logSecurityEvent({
-        userId: 'unknown',
-        action: 'sign_in_failed',
-        resource: 'authentication',
-        allowed: false,
-        subscriptionTier: 'unknown',
-        errorMessage: error.message,
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
+      
+      if (error) {
+        // Log failed sign-in attempt
+        await logSecurityEvent({
+          userId: 'unknown',
+          action: 'sign_in_failed',
+          resource: 'authentication',
+          allowed: false,
+          subscriptionTier: 'unknown',
+          errorMessage: error.message,
+        });
+      }
+      
+      return { error };
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      return { error };
     }
-    
-    return { error };
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    
-    if (error) {
-      // Log failed sign-up attempt
-      await logSecurityEvent({
-        userId: 'unknown',
-        action: 'sign_up_failed',
-        resource: 'authentication',
-        allowed: false,
-        subscriptionTier: 'unknown',
-        errorMessage: error.message,
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
       });
+      
+      if (error) {
+        // Log failed sign-up attempt
+        await logSecurityEvent({
+          userId: 'unknown',
+          action: 'sign_up_failed',
+          resource: 'authentication',
+          allowed: false,
+          subscriptionTier: 'unknown',
+          errorMessage: error.message,
+        });
+      }
+      
+      return { error };
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      return { error };
     }
-    
-    return { error };
   };
 
   const signOut = async () => {
     try {
+      console.log('Starting sign out process...');
+      
       // Log sign out attempt before clearing user state
       if (user) {
         await logSecurityEvent({
@@ -190,18 +204,28 @@ export const useAuth = () => {
         });
       }
 
+      // Clear user state immediately to prevent UI issues
+      setUser(null);
+      setLoading(false);
+
+      // Then perform the actual sign out
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error('Sign out error:', error);
-        return { error };
+        // If sign out fails, we still want to clear local state
+        // The user will be redirected to sign in anyway
+        return { error: null }; // Don't return the error to prevent UI issues
       }
 
-      // User state will be cleared by the auth state change listener
+      console.log('Sign out completed successfully');
       return { error: null };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign out error:', error);
-      return { error: error as Error };
+      // Even if there's an error, clear the local state
+      setUser(null);
+      setLoading(false);
+      return { error: null }; // Don't return the error to prevent UI issues
     }
   };
 
