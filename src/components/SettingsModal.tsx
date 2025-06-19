@@ -23,6 +23,10 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (isUpdating) return;
+    
     setMessage(null);
 
     // Validation
@@ -44,25 +48,38 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     setIsUpdating(true);
 
     try {
-      // Update password using Supabase Auth
-      const { error } = await supabase.auth.updateUser({
+      console.log('Starting password update...');
+      
+      // Use a timeout to prevent infinite hanging
+      const updatePromise = supabase.auth.updateUser({
         password: newPassword
       });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Password update timed out')), 10000); // 10 second timeout
+      });
+
+      const { error } = await Promise.race([updatePromise, timeoutPromise]) as any;
+
+      console.log('Password update completed, error:', error);
 
       if (error) {
         console.error('Password update error:', error);
         
         // Handle specific error cases
-        if (error.message.includes('same_password')) {
+        if (error.message?.includes('same_password')) {
           setMessage({ type: 'error', text: 'New password must be different from your current password' });
-        } else if (error.message.includes('weak_password')) {
+        } else if (error.message?.includes('weak_password')) {
           setMessage({ type: 'error', text: 'Password is too weak. Please choose a stronger password' });
-        } else if (error.message.includes('signup_disabled')) {
+        } else if (error.message?.includes('signup_disabled')) {
           setMessage({ type: 'error', text: 'Password updates are currently disabled' });
+        } else if (error.message?.includes('timeout')) {
+          setMessage({ type: 'error', text: 'Password update timed out. Please try again' });
         } else {
-          setMessage({ type: 'error', text: error.message || 'Failed to update password' });
+          setMessage({ type: 'error', text: error.message || 'Failed to update password. Please try again.' });
         }
       } else {
+        console.log('Password updated successfully');
         setMessage({ type: 'success', text: 'Password updated successfully!' });
         setNewPassword('');
         setConfirmPassword('');
@@ -74,16 +91,28 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
       }
     } catch (error: any) {
       console.error('Unexpected error during password update:', error);
-      setMessage({ 
-        type: 'error', 
-        text: 'An unexpected error occurred. Please try again.' 
-      });
+      
+      if (error.message?.includes('timeout')) {
+        setMessage({ 
+          type: 'error', 
+          text: 'Password update timed out. Please check your connection and try again.' 
+        });
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: 'An unexpected error occurred. Please try again.' 
+        });
+      }
     } finally {
+      console.log('Setting isUpdating to false');
       setIsUpdating(false);
     }
   };
 
   const handleClose = () => {
+    // Don't allow closing while updating
+    if (isUpdating) return;
+    
     setNewPassword('');
     setConfirmPassword('');
     setMessage(null);
@@ -93,9 +122,16 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
   };
 
   const handleManageSubscriptionClick = () => {
+    // Don't allow navigation while updating
+    if (isUpdating) return;
+    
     handleClose();
     onManageSubscription?.();
   };
+
+  const isFormValid = newPassword.length >= 6 && 
+                     confirmPassword.length >= 6 && 
+                     newPassword === confirmPassword;
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -109,7 +145,8 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg"
+            disabled={isUpdating}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
@@ -128,7 +165,8 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
         <div className="mb-4 sm:mb-6">
           <button
             onClick={handleManageSubscriptionClick}
-            className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg shadow-indigo-500/25 text-sm sm:text-base"
+            disabled={isUpdating}
+            className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg shadow-indigo-500/25 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
             Manage Subscription
@@ -149,7 +187,8 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base"
+                disabled={isUpdating}
+                className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Enter new password"
                 required
                 minLength={6}
@@ -158,7 +197,8 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
               <button
                 type="button"
                 onClick={() => setShowNewPassword(!showNewPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={isUpdating}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {showNewPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
@@ -178,7 +218,8 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base"
+                disabled={isUpdating}
+                className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Confirm new password"
                 required
                 minLength={6}
@@ -187,7 +228,8 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={isUpdating}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
@@ -216,7 +258,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
           <button
             type="submit"
-            disabled={isUpdating || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 6}
+            disabled={isUpdating || !isFormValid}
             className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
           >
             {isUpdating ? (
@@ -240,6 +282,13 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                 💡 Choose a strong password with at least 6 characters
               </p>
             </div>
+            {isUpdating && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
+                <p className="text-amber-700 text-xs text-center">
+                  ⏳ Please wait while we update your password...
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
