@@ -149,8 +149,8 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       
       setShowCancelConfirm(false);
       
-      // Show success message
-      alert('Subscription cancelled successfully. You will retain access until the end of your billing period.');
+      // Show success message with assurance
+      alert('✅ Subscription cancelled successfully!\n\n• You will retain access until the end of your billing period\n• All your saved rewrites and writing samples are preserved\n• You can reactivate anytime before the end date\n• No further charges will be made');
     } catch (error) {
       alert('Failed to cancel subscription. Please try again or contact support.');
     } finally {

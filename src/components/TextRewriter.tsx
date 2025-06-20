@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown, Star, CheckCircle, Receipt, Shield, BarChart3 } from 'lucide-react';
+import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown, Star, CheckCircle } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
 import { secureRewriteText, analyzeToneFromSamples } from '../utils/secureStyleAnalyzer';
 import { validateToneAccess, validatePresetAccess, getSubscriptionLimits } from '../utils/subscriptionValidator';
@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import ToneControls from './ToneControls';
 import ComparisonView from './ComparisonView';
+import RewriteHistoryStats from './RewriteHistoryStats';
 
 interface TextRewriterProps {
   samples: WritingSample[];
@@ -33,24 +34,9 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
   });
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [rewriteSaveStatus, setRewriteSaveStatus] = useState<'saving' | 'saved' | 'error' | null>(null);
-  const [rewriteStats, setRewriteStats] = useState<{
-    totalRewrites: number;
-    lastRewrite: Date | null;
-    thisMonth: number;
-  }>({
-    totalRewrites: 0,
-    lastRewrite: null,
-    thisMonth: 0
-  });
+  const [statsRefreshTrigger, setStatsRefreshTrigger] = useState(0);
 
   const { user, updateTokens, updateExports, saveRewriteHistory } = useAuth();
-
-  // Load rewrite statistics when component mounts
-  useEffect(() => {
-    if (user) {
-      loadRewriteStats();
-    }
-  }, [user]);
 
   // Analyze samples and set initial tone settings when component mounts or samples change
   useEffect(() => {
@@ -66,45 +52,6 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
   }, [samples, user]);
 
   const limits = getSubscriptionLimits(user);
-
-  const loadRewriteStats = async () => {
-    if (!user) return;
-
-    try {
-      // Get total rewrite count
-      const { count: totalCount } = await supabase
-        .from('rewrite_history')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      // Get this month's rewrite count
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      const { count: monthlyCount } = await supabase
-        .from('rewrite_history')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', startOfMonth.toISOString());
-
-      // Get last rewrite
-      const { data: lastRewriteData } = await supabase
-        .from('rewrite_history')
-        .select('created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      setRewriteStats({
-        totalRewrites: totalCount || 0,
-        lastRewrite: lastRewriteData?.[0] ? new Date(lastRewriteData[0].created_at) : null,
-        thisMonth: monthlyCount || 0
-      });
-    } catch (error) {
-      console.error('Error loading rewrite stats:', error);
-    }
-  };
 
   const formatTokens = (tokens: number) => {
     if (tokens >= 1000000) {
@@ -183,16 +130,22 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         console.error('Failed to save rewrite history:', saveError);
         setRewriteSaveStatus('error');
         
-        // Show user-friendly error message
+        // Show user-friendly error message based on subscription tier
         if (user.subscription_tier === 'premium') {
-          alert('Warning: Your rewrite was completed but there was an issue saving it to your history. Please contact support if this continues.');
+          alert('Warning: Your rewrite was completed but there was an issue saving it to your unlimited history. Please contact support if this continues.');
+        } else if (user.subscription_tier === 'pro') {
+          alert('Warning: Your rewrite was completed but there was an issue saving it to your history. Your result is still available for export.');
+        } else {
+          // For free users, this is less critical
+          console.warn('Rewrite history save failed for free user:', saveError);
+          setRewriteSaveStatus(null); // Don't show error for free users
         }
       } else {
         console.log('Rewrite history saved successfully');
         setRewriteSaveStatus('saved');
         
-        // Reload stats to show updated counts
-        loadRewriteStats();
+        // Trigger stats refresh
+        setStatsRefreshTrigger(prev => prev + 1);
         
         // Auto-hide save status after 3 seconds
         setTimeout(() => {
@@ -261,7 +214,6 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         processingPriority: limits.hasPriorityProcessing ? (user.subscription_tier === 'premium' ? '3x Speed' : '2x Speed') : 'Standard',
         securityValidated: true,
         rewriteSaved: rewriteSaveStatus === 'saved',
-        rewriteStats: rewriteStats,
       };
       
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -369,106 +321,10 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
       </div>
 
       {/* Rewrite History Status - Moved from Subscription Management */}
-      {user && (
-        <div className="mb-6 p-4 sm:p-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-xl">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h3 className="text-blue-800 font-semibold text-base sm:text-lg">Rewrite History & Analytics</h3>
-              <p className="text-blue-600 text-sm">Track your writing transformations and style evolution</p>
-            </div>
-          </div>
-          
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <div className="bg-white/80 rounded-lg p-4 border border-blue-100">
-              <div className="flex items-center gap-3">
-                <Receipt className="w-5 h-5 text-emerald-500" />
-                <div>
-                  <p className="text-emerald-700 font-bold text-lg">{rewriteStats.totalRewrites}</p>
-                  <p className="text-emerald-600 text-sm">Total Rewrites</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white/80 rounded-lg p-4 border border-blue-100">
-              <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-blue-500" />
-                <div>
-                  <p className="text-blue-700 font-bold text-lg">{rewriteStats.thisMonth}</p>
-                  <p className="text-blue-600 text-sm">This Month</p>
-                </div>
-              </div>
-            </div>
-            
-            {rewriteStats.lastRewrite && (
-              <div className="bg-white/80 rounded-lg p-4 border border-blue-100">
-                <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-purple-500" />
-                  <div>
-                    <p className="text-purple-700 font-bold text-sm">{rewriteStats.lastRewrite.toLocaleDateString()}</p>
-                    <p className="text-purple-600 text-sm">Last Rewrite</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Premium Benefits Highlight */}
-          {user.subscription_tier === 'premium' ? (
-            <div className="bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center">
-                  <Star className="w-3 h-3 text-white" />
-                </div>
-                <div>
-                  <p className="text-amber-800 font-semibold text-sm">Premium Benefit Active</p>
-                  <p className="text-amber-700 text-xs">
-                    ✨ Unlimited rewrite history with full analytics • Advanced style tracking • Export with detailed insights
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : user.subscription_tier === 'pro' ? (
-            <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <Crown className="w-5 h-5 text-blue-600" />
-                <div className="flex-1">
-                  <p className="text-blue-800 font-semibold text-sm">Pro Benefits Active</p>
-                  <p className="text-blue-700 text-xs">
-                    Rewrite history access • Advanced analytics • Up to 200 exports/month
-                  </p>
-                </div>
-                <button
-                  onClick={onOpenPricing}
-                  className="px-3 py-1 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 transition-colors"
-                >
-                  Upgrade for Full Analytics
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-gradient-to-r from-gray-100 to-blue-100 border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <Shield className="w-5 h-5 text-gray-500" />
-                <div className="flex-1">
-                  <p className="text-gray-700 font-semibold text-sm">Limited History Access</p>
-                  <p className="text-gray-600 text-xs">
-                    Free users: Basic rewrite tracking • Upgrade for full history with analytics
-                  </p>
-                </div>
-                <button
-                  onClick={onOpenPricing}
-                  className="px-3 py-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg text-xs font-medium hover:from-blue-600 hover:to-indigo-600 transition-all"
-                >
-                  Get Full Analytics
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <RewriteHistoryStats 
+        onOpenPricing={onOpenPricing}
+        refreshTrigger={statsRefreshTrigger}
+      />
 
       {/* Security Error Alert */}
       {securityError && (
