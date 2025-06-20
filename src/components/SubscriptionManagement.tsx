@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download, Receipt, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download, Receipt, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-
-interface SubscriptionManagementProps {
-  onBack: () => void;
-  onOpenPricing?: () => void;
-}
 
 interface BillingRecord {
   id: string;
@@ -18,12 +13,20 @@ interface BillingRecord {
   subscription_tier: string;
 }
 
+interface SubscriptionManagementProps {
+  onBack: () => void;
+  onOpenPricing?: () => void;
+}
+
 interface SubscriptionStatus {
   isActive: boolean;
   willCancel: boolean;
+  isCancelled: boolean;
   cancelDate?: Date;
   nextBillingDate?: Date;
   gracePeriodEnd?: Date;
+  daysUntilCancellation?: number;
+  cancellationReason?: string;
 }
 
 export default function SubscriptionManagement({ onBack, onOpenPricing }: SubscriptionManagementProps) {
@@ -33,7 +36,8 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
   const [loadingBilling, setLoadingBilling] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>({
     isActive: true,
-    willCancel: false
+    willCancel: false,
+    isCancelled: false
   });
 
   const { user } = useAuth();
@@ -74,16 +78,28 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       const now = new Date();
       const expiresAt = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
       
-      // For testing purposes, simulate subscription status
+      // Calculate subscription status
       const isActive = user.subscription_tier !== 'free';
-      const willCancel = false; // This would come from your payment provider
+      
+      // For demo purposes, simulate different cancellation states
+      // In production, this would come from your payment provider (Stripe, etc.)
+      const willCancel = localStorage.getItem(`subscription_cancelled_${user.id}`) === 'true';
+      const isCancelled = willCancel && expiresAt && now > expiresAt;
+      
+      let daysUntilCancellation = 0;
+      if (willCancel && expiresAt) {
+        daysUntilCancellation = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      }
       
       setSubscriptionStatus({
         isActive,
         willCancel,
+        isCancelled,
         cancelDate: willCancel ? expiresAt : undefined,
         nextBillingDate: isActive && !willCancel ? expiresAt : undefined,
-        gracePeriodEnd: willCancel ? expiresAt : undefined
+        gracePeriodEnd: willCancel ? expiresAt : undefined,
+        daysUntilCancellation: Math.max(0, daysUntilCancellation),
+        cancellationReason: willCancel ? localStorage.getItem(`cancellation_reason_${user.id}`) || 'User requested' : undefined
       });
     } catch (error) {
       console.error('Error checking subscription status:', error);
@@ -140,19 +156,66 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       // In a real app, this would call your backend to cancel the subscription
       await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
       
+      // Store cancellation in localStorage for demo
+      localStorage.setItem(`subscription_cancelled_${user.id}`, 'true');
+      localStorage.setItem(`cancellation_reason_${user.id}`, 'User requested cancellation');
+      
       // Update subscription status to show cancellation
+      const cancelDate = user.subscription_expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const now = new Date();
+      const daysUntilCancellation = Math.ceil((cancelDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
       setSubscriptionStatus({
         ...subscriptionStatus,
         willCancel: true,
-        cancelDate: user.subscription_expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        cancelDate,
+        daysUntilCancellation: Math.max(0, daysUntilCancellation),
+        cancellationReason: 'User requested cancellation'
       });
       
       setShowCancelConfirm(false);
       
-      // Show success message with assurance
-      alert('✅ Subscription cancelled successfully!\n\n• You will retain access until the end of your billing period\n• All your saved rewrites and writing samples are preserved\n• You can reactivate anytime before the end date\n• No further charges will be made');
+      // Show comprehensive success message
+      alert(`✅ Subscription cancelled successfully!
+
+📅 Your ${user.subscription_tier} subscription will remain active until ${cancelDate.toLocaleDateString()}
+
+✨ What this means:
+• You'll keep all premium features until ${cancelDate.toLocaleDateString()}
+• All your saved rewrites and writing samples are preserved
+• No further charges will be made to your payment method
+• You can reactivate anytime before the end date
+
+💡 Need help? Contact support if you have any questions.`);
     } catch (error) {
       alert('Failed to cancel subscription. Please try again or contact support.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    setIsProcessing(true);
+    try {
+      // In a real app, this would call your backend to reactivate
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Remove cancellation from localStorage for demo
+      localStorage.removeItem(`subscription_cancelled_${user.id}`);
+      localStorage.removeItem(`cancellation_reason_${user.id}`);
+      
+      setSubscriptionStatus({
+        ...subscriptionStatus,
+        willCancel: false,
+        isCancelled: false,
+        cancelDate: undefined,
+        cancellationReason: undefined,
+        nextBillingDate: user.subscription_expires_at
+      });
+      
+      alert('✅ Subscription reactivated successfully! Your premium features will continue uninterrupted.');
+    } catch (error) {
+      alert('Failed to reactivate subscription. Please try again or contact support.');
     } finally {
       setIsProcessing(false);
     }
@@ -268,17 +331,60 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         <h1 className="text-2xl font-bold text-gray-800">Subscription Management</h1>
       </div>
 
-      {/* Subscription Status Alert */}
-      {subscriptionStatus.willCancel && (
+      {/* Subscription Status Alerts */}
+      {subscriptionStatus.isCancelled && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <div className="flex items-center gap-3">
+            <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <div>
+              <h3 className="text-red-800 font-medium">Subscription Expired</h3>
+              <p className="text-red-700 text-sm">
+                Your {tierInfo.name} subscription expired on {subscriptionStatus.cancelDate?.toLocaleDateString()}.
+                You're now on the Free plan. Upgrade to restore premium features.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subscriptionStatus.willCancel && !subscriptionStatus.isCancelled && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-amber-800 font-medium">Subscription Scheduled for Cancellation</h3>
+              <p className="text-amber-700 text-sm mb-2">
+                Your {tierInfo.name} subscription will end on{' '}
+                <strong>{subscriptionStatus.cancelDate?.toLocaleDateString()}</strong>
+                {subscriptionStatus.daysUntilCancellation !== undefined && (
+                  <span> ({subscriptionStatus.daysUntilCancellation} days remaining)</span>
+                )}
+              </p>
+              <div className="flex items-center gap-2 text-xs text-amber-600">
+                <Clock className="w-3 h-3" />
+                <span>Reason: {subscriptionStatus.cancellationReason}</span>
+              </div>
+            </div>
+            <button
+              onClick={handleReactivateSubscription}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+            >
+              {isProcessing ? 'Reactivating...' : 'Reactivate'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {subscriptionStatus.isActive && !subscriptionStatus.willCancel && (
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
             <div>
-              <h3 className="text-amber-800 font-medium">Subscription Cancelled</h3>
-              <p className="text-amber-700 text-sm">
-                Your subscription has been cancelled and will end on{' '}
-                {subscriptionStatus.cancelDate?.toLocaleDateString()}. 
-                You'll continue to have access to premium features until then.
+              <h3 className="text-emerald-800 font-medium">Subscription Active</h3>
+              <p className="text-emerald-700 text-sm">
+                Your {tierInfo.name} subscription is active and will renew on{' '}
+                {subscriptionStatus.nextBillingDate?.toLocaleDateString() || 'your next billing date'}.
               </p>
             </div>
           </div>
@@ -300,10 +406,16 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
                   Active
                 </div>
               )}
-              {subscriptionStatus.willCancel && (
+              {subscriptionStatus.willCancel && !subscriptionStatus.isCancelled && (
                 <div className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
-                  <AlertCircle className="w-3 h-3" />
-                  Ending Soon
+                  <Clock className="w-3 h-3" />
+                  Ending {subscriptionStatus.daysUntilCancellation}d
+                </div>
+              )}
+              {subscriptionStatus.isCancelled && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                  <XCircle className="w-3 h-3" />
+                  Expired
                 </div>
               )}
             </div>
@@ -372,10 +484,17 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
               </p>
               <div className="flex items-center justify-between mt-2">
                 <span className={`text-sm font-medium ${
-                  subscriptionStatus.willCancel ? 'text-amber-600' : 'text-emerald-600'
+                  subscriptionStatus.willCancel ? 'text-amber-600' : 
+                  subscriptionStatus.isCancelled ? 'text-red-600' : 'text-emerald-600'
                 }`}>
-                  {subscriptionStatus.willCancel ? 'Cancelled' : 'Active'}
+                  {subscriptionStatus.isCancelled ? 'Expired' :
+                   subscriptionStatus.willCancel ? 'Cancelled' : 'Active'}
                 </span>
+                {subscriptionStatus.daysUntilCancellation !== undefined && subscriptionStatus.daysUntilCancellation > 0 && (
+                  <span className="text-xs text-amber-600">
+                    {subscriptionStatus.daysUntilCancellation} days left
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -385,7 +504,13 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
               <Check className="w-5 h-5 text-emerald-600" />
               <span className="text-gray-800 font-medium">Status</span>
             </div>
-            <p className="text-emerald-600 font-medium">Active</p>
+            <p className={`font-medium ${
+              subscriptionStatus.isCancelled ? 'text-red-600' :
+              subscriptionStatus.willCancel ? 'text-amber-600' : 'text-emerald-600'
+            }`}>
+              {subscriptionStatus.isCancelled ? 'Expired' :
+               subscriptionStatus.willCancel ? 'Ending Soon' : 'Active'}
+            </p>
             <p className="text-xs text-gray-500 mt-1">
               Resets on day {user.monthly_reset_date}
             </p>
@@ -407,12 +532,12 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">
-          {user.subscription_tier === 'free' ? (
+          {user.subscription_tier === 'free' || subscriptionStatus.isCancelled ? (
             <button
               onClick={handleUpgrade}
               className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25"
             >
-              Upgrade Plan
+              {subscriptionStatus.isCancelled ? 'Resubscribe' : 'Upgrade Plan'}
             </button>
           ) : (
             <>
@@ -428,6 +553,15 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
                   className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition-all border border-red-200"
                 >
                   Cancel Subscription
+                </button>
+              )}
+              {subscriptionStatus.willCancel && (
+                <button
+                  onClick={handleReactivateSubscription}
+                  disabled={isProcessing}
+                  className="flex-1 py-3 bg-emerald-50 text-emerald-600 rounded-xl font-medium hover:bg-emerald-100 transition-all border border-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? 'Reactivating...' : 'Reactivate Subscription'}
                 </button>
               )}
             </>
@@ -498,7 +632,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
 
             <div className="mb-6">
               <p className="text-gray-600 mb-4">
-                Are you sure you want to cancel your subscription? You'll lose access to premium features at the end of your billing period.
+                Are you sure you want to cancel your {tierInfo.name} subscription? You'll lose access to premium features at the end of your billing period.
               </p>
               
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -508,6 +642,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
                   <li>• All your saved rewrites and writing samples will be preserved</li>
                   <li>• You can reactivate anytime before the end date</li>
                   <li>• After cancellation, you'll be moved to the free plan</li>
+                  <li>• No further charges will be made to your payment method</li>
                 </ul>
               </div>
             </div>
