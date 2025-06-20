@@ -9,68 +9,106 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('Session error:', error);
-        setLoading(false);
-        return;
-      }
-      
-      if (session?.user) {
-        fetchUserProfile(session.user);
-      } else {
-        setLoading(false);
-      }
-    });
+    let mounted = true;
 
-    // Listen for auth changes
+    // Get initial session with better error handling
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing authentication...');
+        
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session initialization error:', error);
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
+        
+        if (session?.user && mounted) {
+          console.log('Found existing session for user:', session.user.id);
+          await fetchUserProfile(session.user);
+        } else {
+          console.log('No existing session found');
+          if (mounted) {
+            setLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes with improved error handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+
         console.log('Auth state change:', event, session?.user?.id);
         
-        if (session?.user) {
-          await fetchUserProfile(session.user);
-          
-          // Log authentication events
-          if (event === 'SIGNED_IN') {
-            await logSecurityEvent({
-              userId: session.user.id,
-              action: 'user_sign_in',
-              resource: 'authentication',
-              allowed: true,
-              subscriptionTier: 'unknown', // Will be updated after profile fetch
-            });
+        try {
+          if (session?.user) {
+            await fetchUserProfile(session.user);
+            
+            // Log authentication events
+            if (event === 'SIGNED_IN') {
+              await logSecurityEvent({
+                userId: session.user.id,
+                action: 'user_sign_in',
+                resource: 'authentication',
+                allowed: true,
+                subscriptionTier: 'unknown', // Will be updated after profile fetch
+              });
+            }
+          } else {
+            if (event === 'SIGNED_OUT' && user) {
+              await logSecurityEvent({
+                userId: user.id,
+                action: 'user_sign_out',
+                resource: 'authentication',
+                allowed: true,
+                subscriptionTier: user.subscription_tier,
+              });
+            }
+            
+            if (mounted) {
+              setUser(null);
+              setLoading(false);
+            }
           }
-        } else {
-          if (event === 'SIGNED_OUT' && user) {
-            await logSecurityEvent({
-              userId: user.id,
-              action: 'user_sign_out',
-              resource: 'authentication',
-              allowed: true,
-              subscriptionTier: user.subscription_tier,
-            });
+        } catch (error) {
+          console.error('Auth state change error:', error);
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
           }
-          setUser(null);
-          setLoading(false);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []); // Remove user dependency to prevent infinite loops
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('Fetching user profile for:', authUser.id);
       
-      // Reset daily/monthly tokens if needed
+      // Reset daily/monthly tokens if needed (with error handling)
       try {
         await supabase.rpc('reset_daily_tokens');
         await supabase.rpc('reset_monthly_tokens');
       } catch (rpcError) {
         console.warn('Token reset functions not available:', rpcError);
+        // Don't fail the entire auth process if token reset fails
       }
 
       const { data, error } = await supabase
@@ -160,15 +198,41 @@ export const useAuth = () => {
     try {
       console.log('Attempting sign in for:', email);
       
+      // Clear any existing session first
+      await supabase.auth.signOut();
+      
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
       
-      console.log('Sign in response:', { data: !!data, error });
+      console.log('Sign in response:', { 
+        success: !error, 
+        error: error?.message,
+        user: data?.user?.id 
+      });
       
       if (error) {
         console.error('Sign in error:', error);
+        
+        // Enhanced error handling
+        let userFriendlyMessage = error.message;
+        
+        switch (error.message) {
+          case 'Invalid login credentials':
+            userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
+            break;
+          case 'Email not confirmed':
+            userFriendlyMessage = 'Please check your email and click the confirmation link before signing in.';
+            break;
+          case 'Too many requests':
+            userFriendlyMessage = 'Too many login attempts. Please wait a few minutes before trying again.';
+            break;
+          case 'User not found':
+            userFriendlyMessage = 'No account found with this email address.';
+            break;
+        }
+        
         // Log failed sign-in attempt
         await logSecurityEvent({
           userId: 'unknown',
@@ -178,12 +242,18 @@ export const useAuth = () => {
           subscriptionTier: 'unknown',
           errorMessage: error.message,
         });
+        
+        return { error: { ...error, message: userFriendlyMessage } };
       }
       
-      return { error };
+      return { error: null };
     } catch (error: any) {
       console.error('Sign in exception:', error);
-      return { error };
+      return { 
+        error: { 
+          message: 'Network error. Please check your connection and try again.' 
+        } 
+      };
     }
   };
 
@@ -192,14 +262,37 @@ export const useAuth = () => {
       console.log('Attempting sign up for:', email);
       
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
+        options: {
+          emailRedirectTo: undefined, // Disable email confirmation for now
+        }
       });
       
-      console.log('Sign up response:', { data: !!data, error });
+      console.log('Sign up response:', { 
+        success: !error, 
+        error: error?.message,
+        user: data?.user?.id 
+      });
       
       if (error) {
         console.error('Sign up error:', error);
+        
+        // Enhanced error handling
+        let userFriendlyMessage = error.message;
+        
+        switch (error.message) {
+          case 'User already registered':
+            userFriendlyMessage = 'An account with this email already exists. Please sign in instead.';
+            break;
+          case 'Password should be at least 6 characters':
+            userFriendlyMessage = 'Password must be at least 6 characters long.';
+            break;
+          case 'Unable to validate email address: invalid format':
+            userFriendlyMessage = 'Please enter a valid email address.';
+            break;
+        }
+        
         // Log failed sign-up attempt
         await logSecurityEvent({
           userId: 'unknown',
@@ -209,12 +302,18 @@ export const useAuth = () => {
           subscriptionTier: 'unknown',
           errorMessage: error.message,
         });
+        
+        return { error: { ...error, message: userFriendlyMessage } };
       }
       
-      return { error };
+      return { error: null };
     } catch (error: any) {
       console.error('Sign up exception:', error);
-      return { error };
+      return { 
+        error: { 
+          message: 'Network error. Please check your connection and try again.' 
+        } 
+      };
     }
   };
 

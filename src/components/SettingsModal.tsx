@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown, RefreshCw, Star, Zap } from 'lucide-react';
+import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown, Star, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import PasswordChangeConfirmation from './PasswordChangeConfirmation';
@@ -89,12 +89,12 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     try {
       console.log('Checking current session...');
       
-      // Get current session
+      // Get current session with better error handling
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
         console.error('Session error:', sessionError);
-        throw new Error('Session validation failed. Please sign out and sign back in.');
+        throw new Error(`Session validation failed: ${sessionError.message}`);
       }
 
       if (!session?.user) {
@@ -104,27 +104,27 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
       console.log('Valid session found, updating password...');
       
-      // Update password with explicit error handling
-      const updateResult = await supabase.auth.updateUser({
+      // Update password with better error handling
+      const { data, error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       console.log('Password update result:', { 
-        success: !updateResult.error, 
-        error: updateResult.error?.message,
-        data: !!updateResult.data 
+        success: !updateError, 
+        error: updateError?.message,
+        data: !!data 
       });
 
       // Clear timeout since we got a response
       clearTimeout(timeoutId);
 
-      if (updateResult.error) {
-        console.error('Password update failed:', updateResult.error);
+      if (updateError) {
+        console.error('Password update failed:', updateError);
         
-        // Handle specific error cases
+        // Handle specific error cases with better messaging
         let errorMessage = 'Password update failed. ';
         
-        switch (updateResult.error.message) {
+        switch (updateError.message) {
           case 'New password should be different from the old password.':
             errorMessage = 'New password must be different from your current password.';
             break;
@@ -140,8 +140,11 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
           case 'User not found':
             errorMessage = 'User account not found. Please sign out and sign back in.';
             break;
+          case 'JWT expired':
+            errorMessage = 'Your session has expired. Please sign out and sign back in.';
+            break;
           default:
-            errorMessage += updateResult.error.message;
+            errorMessage += updateError.message;
         }
         
         setPasswordChangeStatus('error');
@@ -165,11 +168,15 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
       // Clear timeout
       clearTimeout(timeoutId);
       
-      // Handle different types of errors
+      // Handle different types of errors with better messaging
       let errorMessage = 'An unexpected error occurred. ';
       
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message?.includes('JWT')) {
+        errorMessage = 'Your session has expired. Please sign out and sign back in.';
+      } else if (error.message?.includes('session')) {
+        errorMessage = 'Session error. Please sign out and sign back in.';
       } else if (error.message) {
         errorMessage = error.message;
       } else {
@@ -229,35 +236,6 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
       setMessage({ type: 'error', text: 'An error occurred during upgrade. Please try again.' });
     } finally {
       setIsUpgrading(false);
-    }
-  };
-
-  const handleRefreshSession = async () => {
-    try {
-      setMessage({ type: 'info', text: 'Refreshing session...' });
-      
-      const { data, error } = await supabase.auth.refreshSession();
-      
-      if (error) {
-        console.error('Session refresh error:', error);
-        setMessage({ 
-          type: 'error', 
-          text: 'Failed to refresh session. Please sign out and sign back in.' 
-        });
-      } else {
-        console.log('Session refreshed successfully');
-        setMessage({ type: 'success', text: 'Session refreshed! You can now try updating your password.' });
-        
-        setTimeout(() => {
-          setMessage(null);
-        }, 3000);
-      }
-    } catch (error) {
-      console.error('Session refresh exception:', error);
-      setMessage({ 
-        type: 'error', 
-        text: 'Failed to refresh session. Please sign out and sign back in.' 
-      });
     }
   };
 
@@ -390,15 +368,6 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
           <form onSubmit={handlePasswordUpdate} className="space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-gray-800 font-medium text-sm sm:text-base">Change Password</h3>
-              <button
-                type="button"
-                onClick={handleRefreshSession}
-                disabled={isUpdating || isUpgrading}
-                className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2 py-1 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Refresh Session
-              </button>
             </div>
             
             <div>
@@ -475,7 +444,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
                   {message.type === 'success' ? (
                     <Check className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   ) : message.type === 'info' ? (
-                    <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 animate-spin" />
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
                   ) : (
                     <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                   )}
@@ -507,7 +476,7 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
                 <p className="text-blue-700 text-xs text-center">
-                  💡 If you're having issues, try refreshing your session first
+                  💡 If you experience login issues, try signing out and back in
                 </p>
               </div>
               {(isUpdating || isUpgrading) && (
