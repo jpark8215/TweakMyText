@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download, Receipt } from 'lucide-react';
+import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download, Receipt, Shield, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -18,16 +18,33 @@ interface BillingRecord {
   subscription_tier: string;
 }
 
+interface SubscriptionStatus {
+  isActive: boolean;
+  willCancel: boolean;
+  cancelDate?: Date;
+  nextBillingDate?: Date;
+  gracePeriodEnd?: Date;
+}
+
 export default function SubscriptionManagement({ onBack, onOpenPricing }: SubscriptionManagementProps) {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [loadingBilling, setLoadingBilling] = useState(true);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>({
+    isActive: true,
+    willCancel: false
+  });
+  const [rewritesSaved, setRewritesSaved] = useState<number>(0);
+  const [lastRewriteCheck, setLastRewriteCheck] = useState<Date | null>(null);
+
   const { user } = useAuth();
 
   useEffect(() => {
     if (user) {
       loadBillingHistory();
+      checkSubscriptionStatus();
+      checkRewriteHistory();
     }
   }, [user]);
 
@@ -41,12 +58,78 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
     return tokens.toString();
   };
 
+  const checkSubscriptionStatus = async () => {
+    if (!user) return;
+
+    try {
+      // Check if subscription is marked for cancellation
+      const { data, error } = await supabase
+        .from('users')
+        .select('subscription_tier, subscription_expires_at, created_at')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error checking subscription status:', error);
+        return;
+      }
+
+      const now = new Date();
+      const expiresAt = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
+      
+      // For testing purposes, simulate subscription status
+      const isActive = user.subscription_tier !== 'free';
+      const willCancel = false; // This would come from your payment provider
+      
+      setSubscriptionStatus({
+        isActive,
+        willCancel,
+        cancelDate: willCancel ? expiresAt : undefined,
+        nextBillingDate: isActive && !willCancel ? expiresAt : undefined,
+        gracePeriodEnd: willCancel ? expiresAt : undefined
+      });
+    } catch (error) {
+      console.error('Error checking subscription status:', error);
+    }
+  };
+
+  const checkRewriteHistory = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('rewrite_history')
+        .select('id, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error checking rewrite history:', error);
+        return;
+      }
+
+      const { count } = await supabase
+        .from('rewrite_history')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      setRewritesSaved(count || 0);
+      
+      if (data && data.length > 0) {
+        setLastRewriteCheck(new Date(data[0].created_at));
+      }
+    } catch (error) {
+      console.error('Error checking rewrite history:', error);
+    }
+  };
+
   const loadBillingHistory = async () => {
     if (!user) return;
 
     setLoadingBilling(true);
     try {
-      // Load real billing history from database only - NO SAMPLE DATA
+      // Load real billing history from database
       const { data: realBillingData, error } = await supabase
         .from('billing_history')
         .select('*')
@@ -58,7 +141,6 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         console.error('Error loading billing history:', error);
         setBillingHistory([]);
       } else {
-        // Only use real data from database - no mock/sample data at all
         setBillingHistory(realBillingData || []);
       }
     } catch (error) {
@@ -91,8 +173,18 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
     try {
       // In a real app, this would call your backend to cancel the subscription
       await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
-      alert('Subscription cancelled successfully. You will retain access until the end of your billing period.');
+      
+      // Update subscription status to show cancellation
+      setSubscriptionStatus({
+        ...subscriptionStatus,
+        willCancel: true,
+        cancelDate: user.subscription_expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      });
+      
       setShowCancelConfirm(false);
+      
+      // Show success message
+      alert('Subscription cancelled successfully. You will retain access until the end of your billing period.');
     } catch (error) {
       alert('Failed to cancel subscription. Please try again or contact support.');
     } finally {
@@ -210,6 +302,59 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         <h1 className="text-2xl font-bold text-gray-800">Subscription Management</h1>
       </div>
 
+      {/* Subscription Status Alert */}
+      {subscriptionStatus.willCancel && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <h3 className="text-amber-800 font-medium">Subscription Cancelled</h3>
+              <p className="text-amber-700 text-sm">
+                Your subscription has been cancelled and will end on{' '}
+                {subscriptionStatus.cancelDate?.toLocaleDateString()}. 
+                You'll continue to have access to premium features until then.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rewrite History Status */}
+      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+        <div className="flex items-center gap-3 mb-3">
+          <Shield className="w-5 h-5 text-blue-600" />
+          <h3 className="text-blue-800 font-medium">Rewrite History Status</h3>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-4 h-4 text-emerald-500" />
+            <div>
+              <p className="text-blue-800 font-medium">{rewritesSaved} Rewrites Saved</p>
+              <p className="text-blue-600 text-sm">All your rewrites are automatically saved</p>
+            </div>
+          </div>
+          {lastRewriteCheck && (
+            <div className="flex items-center gap-3">
+              <Calendar className="w-4 h-4 text-blue-500" />
+              <div>
+                <p className="text-blue-800 font-medium">Last Rewrite</p>
+                <p className="text-blue-600 text-sm">{lastRewriteCheck.toLocaleDateString()}</p>
+              </div>
+            </div>
+          )}
+        </div>
+        {user.subscription_tier === 'premium' && (
+          <div className="mt-3 p-3 bg-amber-100 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Star className="w-4 h-4 text-amber-600" />
+              <p className="text-amber-800 text-sm font-medium">
+                Premium Benefit: Unlimited rewrite history with full analytics
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Current Plan */}
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200 p-6 sm:p-8 mb-8 shadow-lg">
         <div className="flex items-center gap-4 mb-6">
@@ -217,7 +362,21 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
             <Crown className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-800">{tierInfo.name} Plan</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold text-gray-800">{tierInfo.name} Plan</h2>
+              {subscriptionStatus.isActive && !subscriptionStatus.willCancel && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                  <CheckCircle className="w-3 h-3" />
+                  Active
+                </div>
+              )}
+              {subscriptionStatus.willCancel && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                  <AlertCircle className="w-3 h-3" />
+                  Ending Soon
+                </div>
+              )}
+            </div>
             <p className="text-gray-600">{tierInfo.price}</p>
           </div>
         </div>
@@ -270,28 +429,40 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
             )}
           </div>
 
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Receipt className="w-5 h-5 text-purple-600" />
+              <span className="text-gray-800 font-medium">Rewrites Saved</span>
+            </div>
+            <p className="text-gray-600 text-sm mb-2">
+              {user.subscription_tier === 'premium' ? 'Unlimited history' : 'Last 30 days'}
+            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-purple-600 text-lg font-bold">{rewritesSaved}</p>
+              <CheckCircle className="w-4 h-4 text-emerald-500" />
+            </div>
+          </div>
+
           {user.subscription_expires_at && (
             <div className="bg-gray-50 rounded-xl p-4">
               <div className="flex items-center gap-3 mb-2">
                 <Calendar className="w-5 h-5 text-indigo-600" />
-                <span className="text-gray-800 font-medium">Next Billing</span>
+                <span className="text-gray-800 font-medium">
+                  {subscriptionStatus.willCancel ? 'Access Ends' : 'Next Billing'}
+                </span>
               </div>
               <p className="text-gray-600 text-sm">
                 {user.subscription_expires_at.toLocaleDateString()}
               </p>
+              <div className="flex items-center justify-between mt-2">
+                <span className={`text-sm font-medium ${
+                  subscriptionStatus.willCancel ? 'text-amber-600' : 'text-emerald-600'
+                }`}>
+                  {subscriptionStatus.willCancel ? 'Cancelled' : 'Active'}
+                </span>
+              </div>
             </div>
           )}
-
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <Check className="w-5 h-5 text-emerald-600" />
-              <span className="text-gray-800 font-medium">Status</span>
-            </div>
-            <p className="text-emerald-600 font-medium">Active</p>
-            <p className="text-xs text-gray-500 mt-1">
-              Resets on day {user.monthly_reset_date}
-            </p>
-          </div>
         </div>
 
         {/* Plan Features */}
@@ -324,12 +495,14 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
               >
                 {user.subscription_tier === 'pro' ? 'Upgrade to Premium' : 'Change Plan'}
               </button>
-              <button
-                onClick={() => setShowCancelConfirm(true)}
-                className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition-all border border-red-200"
-              >
-                Cancel Subscription
-              </button>
+              {!subscriptionStatus.willCancel && (
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition-all border border-red-200"
+                >
+                  Cancel Subscription
+                </button>
+              )}
             </>
           )}
         </div>
@@ -396,9 +569,21 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
               <h3 className="text-xl font-bold text-gray-800">Cancel Subscription</h3>
             </div>
 
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to cancel your subscription? You'll lose access to premium features at the end of your billing period.
-            </p>
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to cancel your subscription? You'll lose access to premium features at the end of your billing period.
+              </p>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <h4 className="text-amber-800 font-medium text-sm mb-2">What happens when you cancel:</h4>
+                <ul className="text-amber-700 text-sm space-y-1">
+                  <li>• Your subscription will remain active until {user.subscription_expires_at?.toLocaleDateString()}</li>
+                  <li>• All your saved rewrites and writing samples will be preserved</li>
+                  <li>• You can reactivate anytime before the end date</li>
+                  <li>• After cancellation, you'll be moved to the free plan</li>
+                </ul>
+              </div>
+            </div>
 
             <div className="flex gap-3">
               <button

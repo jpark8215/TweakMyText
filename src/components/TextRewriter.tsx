@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown, Star } from 'lucide-react';
+import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown, Star, CheckCircle } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
 import { secureRewriteText, analyzeToneFromSamples } from '../utils/secureStyleAnalyzer';
 import { validateToneAccess, validatePresetAccess, getSubscriptionLimits } from '../utils/subscriptionValidator';
@@ -23,11 +23,18 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
     formality: 50,
     casualness: 50,
     enthusiasm: 50,
-    technicality: 50
+    technicality: 50,
+    creativity: 50,
+    empathy: 50,
+    confidence: 50,
+    humor: 50,
+    urgency: 50,
+    clarity: 50
   });
   const [securityError, setSecurityError] = useState<string | null>(null);
+  const [rewriteSaveStatus, setRewriteSaveStatus] = useState<'saving' | 'saved' | 'error' | null>(null);
 
-  const { user, updateTokens, updateExports } = useAuth();
+  const { user, updateTokens, updateExports, saveRewriteHistory } = useAuth();
 
   // Analyze samples and set initial tone settings when component mounts or samples change
   useEffect(() => {
@@ -63,6 +70,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
     if (!inputText.trim() || !user) return;
     
     setSecurityError(null);
+    setRewriteSaveStatus(null);
     
     const estimatedTokens = estimateTokenUsage(inputText);
     
@@ -99,22 +107,40 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
       setResult(rewriteResult);
 
       // Deduct tokens and save to database
-      const { error } = await updateTokens(estimatedTokens);
+      const { error: tokenError } = await updateTokens(estimatedTokens);
       
-      if (error) {
-        alert(error.message);
+      if (tokenError) {
+        alert(tokenError.message);
         return;
       }
 
-      // Save rewrite history with security audit trail
-      await supabase.from('rewrite_history').insert({
-        user_id: user.id,
+      // Save rewrite history with enhanced error handling
+      setRewriteSaveStatus('saving');
+      
+      const { error: saveError } = await saveRewriteHistory({
         original_text: rewriteResult.original,
         rewritten_text: rewriteResult.rewritten,
         confidence: rewriteResult.confidence,
         style_tags: rewriteResult.styleTags,
-        credits_used: 1, // Keep for compatibility, but tokens are tracked separately
       });
+
+      if (saveError) {
+        console.error('Failed to save rewrite history:', saveError);
+        setRewriteSaveStatus('error');
+        
+        // Show user-friendly error message
+        if (user.subscription_tier === 'premium') {
+          alert('Warning: Your rewrite was completed but there was an issue saving it to your history. Please contact support if this continues.');
+        }
+      } else {
+        console.log('Rewrite history saved successfully');
+        setRewriteSaveStatus('saved');
+        
+        // Auto-hide save status after 3 seconds
+        setTimeout(() => {
+          setRewriteSaveStatus(null);
+        }, 3000);
+      }
 
     } catch (error: any) {
       console.error('Rewrite failed:', error);
@@ -176,6 +202,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         analysisType: limits.hasExtendedAnalysis ? 'Extended' : limits.hasAdvancedAnalysis ? 'Advanced' : 'Basic',
         processingPriority: limits.hasPriorityProcessing ? (user.subscription_tier === 'premium' ? '3x Speed' : '2x Speed') : 'Standard',
         securityValidated: true,
+        rewriteSaved: rewriteSaveStatus === 'saved',
       };
       
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -291,6 +318,48 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
               <p className="text-red-700 font-medium text-sm sm:text-base">Access Restricted</p>
               <p className="text-red-600 text-xs sm:text-sm">{securityError}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rewrite Save Status */}
+      {rewriteSaveStatus && (
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <div className="flex items-center gap-3">
+            {rewriteSaveStatus === 'saving' && (
+              <>
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                <div>
+                  <p className="text-blue-700 font-medium text-sm sm:text-base">Saving Rewrite</p>
+                  <p className="text-blue-600 text-xs sm:text-sm">Your rewrite is being saved to your history...</p>
+                </div>
+              </>
+            )}
+            {rewriteSaveStatus === 'saved' && (
+              <>
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500 flex-shrink-0" />
+                <div>
+                  <p className="text-emerald-700 font-medium text-sm sm:text-base">Rewrite Saved</p>
+                  <p className="text-emerald-600 text-xs sm:text-sm">
+                    {user?.subscription_tier === 'premium' 
+                      ? 'Saved to your unlimited rewrite history with full analytics'
+                      : 'Successfully saved to your rewrite history'
+                    }
+                  </p>
+                </div>
+              </>
+            )}
+            {rewriteSaveStatus === 'error' && (
+              <>
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 flex-shrink-0" />
+                <div>
+                  <p className="text-amber-700 font-medium text-sm sm:text-base">Save Warning</p>
+                  <p className="text-amber-600 text-xs sm:text-sm">
+                    Rewrite completed but couldn't save to history. Your result is still available for export.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

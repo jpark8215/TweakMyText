@@ -620,6 +620,64 @@ export const useAuth = () => {
     }
   };
 
+  // Enhanced rewrite history saving
+  const saveRewriteHistory = async (rewriteData: {
+    original_text: string;
+    rewritten_text: string;
+    confidence: number;
+    style_tags: string[];
+  }) => {
+    if (!user) return { error: new Error('No user found') };
+
+    try {
+      console.log('Saving rewrite history for user:', user.id);
+      
+      const { data, error } = await supabase
+        .from('rewrite_history')
+        .insert({
+          user_id: user.id,
+          original_text: rewriteData.original_text,
+          rewritten_text: rewriteData.rewritten_text,
+          confidence: rewriteData.confidence,
+          style_tags: rewriteData.style_tags,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Failed to save rewrite history:', error);
+        
+        // Log rewrite save error
+        await logSecurityEvent({
+          userId: user.id,
+          action: 'rewrite_save_error',
+          resource: 'rewrite_history',
+          allowed: false,
+          subscriptionTier: user.subscription_tier,
+          errorMessage: error.message,
+        });
+        
+        return { error };
+      }
+
+      console.log('Rewrite history saved successfully:', data.id);
+      
+      // Log successful rewrite save
+      await logSecurityEvent({
+        userId: user.id,
+        action: 'rewrite_saved',
+        resource: 'rewrite_history',
+        allowed: true,
+        subscriptionTier: user.subscription_tier,
+      });
+
+      return { error: null, data };
+    } catch (error: any) {
+      console.error('Exception saving rewrite history:', error);
+      return { error };
+    }
+  };
+
   return {
     user,
     loading,
@@ -628,5 +686,6 @@ export const useAuth = () => {
     signOut,
     updateTokens,
     updateExports,
+    saveRewriteHistory,
   };
 };
