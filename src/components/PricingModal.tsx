@@ -221,7 +221,7 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
                 <div className="space-y-1 text-gray-700">
                   <div>Free: View-only (auto-detected)</div>
                   <div>Pro: 6 adjustable controls + presets</div>
-                  <div>Premium: All 10 controls + custom fine-tuning</div>
+                  <div>Premium: All 10 controls + advanced presets</div>
                 </div>
               </div>
               <div className="space-y-2">
