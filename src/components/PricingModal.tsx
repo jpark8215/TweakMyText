@@ -19,8 +19,8 @@ const pricingTiers: PricingTier[] = [
       'Basic style analysis',
       'Save up to 3 writing samples',
       '5 exports per month',
-      'View-only tone controls (auto-detected)',
       'Standard processing speed'
+      'View-only tone controls (auto-detected)'
     ],
     limits: {
       writingSamples: 3,
@@ -45,10 +45,10 @@ const pricingTiers: PricingTier[] = [
       'Advanced style analysis',
       'Save up to 25 writing samples',
       'Export results (up to 200 per month)',
-      'Rewrite history access',
-      'Manual tone adjustment + basic presets',
       'Priority processing (2x faster)',
+      'Tone adjustment + basic presets',
       '6 core tone controls (formality, casual, enthusiasm, technical, creativity, empathy)'
+      'Rewrite history access'
     ],
     popular: true,
     limits: {
@@ -74,11 +74,10 @@ const pricingTiers: PricingTier[] = [
       'Extended style analysis with confidence scoring',
       'Save up to 100 writing samples',
       'Unlimited exports & rewrite history',
-      'Full rewrite history with analytics',
-      'Bulk rewrite operations',
-      'Custom tone fine-tuning with advanced presets',
       'Fastest processing (3x speed)',
+      'Tone adjustment + advanced presets',
       'All 10 tone controls (formality, casual, enthusiasm, technical, creativity, empathy, confidence, humor, urgency, clarity)'
+      'Full rewrite history with analytics',
     ],
     limits: {
       writingSamples: 100,
