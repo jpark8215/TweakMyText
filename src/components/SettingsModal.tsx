@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Lock, Eye, EyeOff, Check, AlertCircle, Crown, RefreshCw, Star, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import PasswordChangeConfirmation from './PasswordChangeConfirmation';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -17,15 +18,36 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  
+  // Password change confirmation states
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
+  const [passwordChangeStatus, setPasswordChangeStatus] = useState<'success' | 'error' | 'loading' | null>(null);
+  const [passwordChangeError, setPasswordChangeError] = useState<string>('');
 
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   if (!isOpen || !user) return null;
+
+  const logPasswordChangeAttempt = (success: boolean, errorDetails?: string) => {
+    const logData = {
+      timestamp: new Date().toISOString(),
+      userId: user.id,
+      userEmail: user.email,
+      success,
+      errorDetails: errorDetails || null,
+      userAgent: navigator.userAgent,
+      sessionId: crypto.randomUUID()
+    };
+
+    console.log('Password Change Attempt:', logData);
+    
+    // In production, send to your logging service
+    // Example: analytics.track('password_change_attempt', logData);
+  };
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Prevent multiple submissions
     if (isUpdating) {
       console.log('Password update already in progress, ignoring submission');
       return;
@@ -51,16 +73,17 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
     console.log('Starting password update process...');
     setIsUpdating(true);
-    setMessage({ type: 'info', text: 'Updating your password...' });
+    setShowPasswordConfirmation(true);
+    setPasswordChangeStatus('loading');
+    setPasswordChangeError('');
 
     // Set a timeout to prevent infinite updating
     const timeoutId = setTimeout(() => {
       console.log('Password update timeout reached');
       setIsUpdating(false);
-      setMessage({ 
-        type: 'error', 
-        text: 'Password update timed out. Please try again.' 
-      });
+      setPasswordChangeStatus('error');
+      setPasswordChangeError('Password update timed out. Please try again.');
+      logPasswordChangeAttempt(false, 'Timeout after 30 seconds');
     }, 30000); // 30 second timeout
 
     try {
@@ -121,22 +144,20 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
             errorMessage += updateResult.error.message;
         }
         
-        setMessage({ type: 'error', text: errorMessage });
+        setPasswordChangeStatus('error');
+        setPasswordChangeError(errorMessage);
+        logPasswordChangeAttempt(false, errorMessage);
       } else {
         console.log('Password updated successfully!');
-        setMessage({ type: 'success', text: 'Password updated successfully!' });
+        setPasswordChangeStatus('success');
+        logPasswordChangeAttempt(true);
         
         // Clear form
         setNewPassword('');
         setConfirmPassword('');
         setShowNewPassword(false);
         setShowConfirmPassword(false);
-        
-        // Auto-clear success message and close modal after 2 seconds
-        setTimeout(() => {
-          setMessage(null);
-          onClose();
-        }, 2000);
+        setMessage(null);
       }
     } catch (error: any) {
       console.error('Password update exception:', error);
@@ -155,7 +176,9 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
         errorMessage += 'Please try again or contact support.';
       }
       
-      setMessage({ type: 'error', text: errorMessage });
+      setPasswordChangeStatus('error');
+      setPasswordChangeError(errorMessage);
+      logPasswordChangeAttempt(false, errorMessage);
     } finally {
       console.log('Password update process completed');
       setIsUpdating(false);
@@ -250,6 +273,9 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     setMessage(null);
     setShowNewPassword(false);
     setShowConfirmPassword(false);
+    setShowPasswordConfirmation(false);
+    setPasswordChangeStatus(null);
+    setPasswordChangeError('');
     onClose();
   };
 
@@ -261,222 +287,249 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     onManageSubscription?.();
   };
 
+  const handleBackToLogin = async () => {
+    try {
+      await signOut();
+      handleClose();
+    } catch (error) {
+      console.error('Sign out error:', error);
+      handleClose();
+    }
+  };
+
+  const handleRetryPasswordChange = () => {
+    setShowPasswordConfirmation(false);
+    setPasswordChangeStatus(null);
+    setPasswordChangeError('');
+  };
+
   const isFormValid = newPassword.length >= 6 && 
                      confirmPassword.length >= 6 && 
                      newPassword === confirmPassword;
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 lg:p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl flex items-center justify-center">
-              <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+    <>
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 lg:p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl flex items-center justify-center">
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Settings</h2>
             </div>
-            <h2 className="text-lg sm:text-xl font-bold text-gray-800">Settings</h2>
-          </div>
-          <button
-            onClick={handleClose}
-            disabled={isUpdating || isUpgrading}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-        </div>
-
-        {/* Account Info */}
-        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-200">
-          <h3 className="text-gray-800 font-medium mb-2 text-sm sm:text-base">Account Information</h3>
-          <p className="text-gray-600 text-xs sm:text-sm break-all">{user.email}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-gray-500 text-xs">Plan:</span>
-            <span className={`text-xs font-medium capitalize px-2 py-1 rounded-full ${
-              user.subscription_tier === 'premium' ? 'bg-amber-100 text-amber-700' :
-              user.subscription_tier === 'pro' ? 'bg-blue-100 text-blue-700' :
-              'bg-gray-100 text-gray-700'
-            }`}>
-              {user.subscription_tier}
-            </span>
-          </div>
-        </div>
-
-        {/* Testing Upgrade Section */}
-        {user.subscription_tier === 'free' && (
-          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
-            <h3 className="text-gray-800 font-medium mb-2 text-sm sm:text-base flex items-center gap-2">
-              <Zap className="w-4 h-4 text-blue-600" />
-              Testing Mode - Upgrade Subscription
-            </h3>
-            <p className="text-gray-600 text-xs mb-3">
-              For testing purposes, you can upgrade your account to Pro or Premium to test premium features.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleUpgradeToTier('pro')}
-                disabled={isUpgrading || isUpdating}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Crown className="w-3 h-3" />
-                Upgrade to Pro
-              </button>
-              <button
-                onClick={() => handleUpgradeToTier('premium')}
-                disabled={isUpgrading || isUpdating}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Star className="w-3 h-3" />
-                Upgrade to Premium
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Subscription Management */}
-        <div className="mb-4 sm:mb-6">
-          <button
-            onClick={handleManageSubscriptionClick}
-            disabled={isUpdating || isUpgrading}
-            className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg shadow-indigo-500/25 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
-            Manage Subscription
-          </button>
-        </div>
-
-        {/* Password Change Form */}
-        <form onSubmit={handlePasswordUpdate} className="space-y-3 sm:space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-gray-800 font-medium text-sm sm:text-base">Change Password</h3>
             <button
-              type="button"
-              onClick={handleRefreshSession}
+              onClick={handleClose}
               disabled={isUpdating || isUpgrading}
-              className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2 py-1 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <RefreshCw className="w-3 h-3" />
-              Refresh Session
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
-          
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-              New Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-              <input
-                type={showNewPassword ? 'text' : 'password'}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                disabled={isUpdating || isUpgrading}
-                className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                placeholder="Enter new password"
-                required
-                minLength={6}
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowNewPassword(!showNewPassword)}
-                disabled={isUpdating || isUpgrading}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {showNewPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
-              </button>
+
+          {/* Account Info */}
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <h3 className="text-gray-800 font-medium mb-2 text-sm sm:text-base">Account Information</h3>
+            <p className="text-gray-600 text-xs sm:text-sm break-all">{user.email}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-gray-500 text-xs">Plan:</span>
+              <span className={`text-xs font-medium capitalize px-2 py-1 rounded-full ${
+                user.subscription_tier === 'premium' ? 'bg-amber-100 text-amber-700' :
+                user.subscription_tier === 'pro' ? 'bg-blue-100 text-blue-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {user.subscription_tier}
+              </span>
             </div>
-            {newPassword && newPassword.length < 6 && (
-              <p className="text-xs text-amber-600 mt-1">Password must be at least 6 characters</p>
-            )}
           </div>
 
-          <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-              Confirm New Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={isUpdating || isUpgrading}
-                className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                placeholder="Confirm new password"
-                required
-                minLength={6}
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                disabled={isUpdating || isUpgrading}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {showConfirmPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
-              </button>
-            </div>
-            {confirmPassword && newPassword && confirmPassword !== newPassword && (
-              <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
-            )}
-          </div>
-
-          {message && (
-            <div className={`p-3 rounded-lg border ${
-              message.type === 'success' 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                : message.type === 'info'
-                ? 'bg-blue-50 border-blue-200 text-blue-700'
-                : 'bg-red-50 border-red-200 text-red-600'
-            }`}>
-              <div className="flex items-center gap-2">
-                {message.type === 'success' ? (
-                  <Check className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                ) : message.type === 'info' ? (
-                  <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 animate-spin" />
-                ) : (
-                  <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                )}
-                <span className="text-xs sm:text-sm">{message.text}</span>
+          {/* Testing Upgrade Section */}
+          {user.subscription_tier === 'free' && (
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
+              <h3 className="text-gray-800 font-medium mb-2 text-sm sm:text-base flex items-center gap-2">
+                <Zap className="w-4 h-4 text-blue-600" />
+                Testing Mode - Upgrade Subscription
+              </h3>
+              <p className="text-gray-600 text-xs mb-3">
+                For testing purposes, you can upgrade your account to Pro or Premium to test premium features.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleUpgradeToTier('pro')}
+                  disabled={isUpgrading || isUpdating}
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Crown className="w-3 h-3" />
+                  Upgrade to Pro
+                </button>
+                <button
+                  onClick={() => handleUpgradeToTier('premium')}
+                  disabled={isUpgrading || isUpdating}
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Star className="w-3 h-3" />
+                  Upgrade to Premium
+                </button>
               </div>
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={isUpdating || isUpgrading || !isFormValid}
-            className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
-          >
-            {isUpdating ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Updating Password...
-              </div>
-            ) : (
-              'Update Password'
-            )}
-          </button>
-        </form>
+          {/* Subscription Management */}
+          <div className="mb-4 sm:mb-6">
+            <button
+              onClick={handleManageSubscriptionClick}
+              disabled={isUpdating || isUpgrading}
+              className="w-full flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-105 shadow-lg shadow-indigo-500/25 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
+              Manage Subscription
+            </button>
+          </div>
 
-        <div className="mt-4 sm:mt-6 pt-3 sm:pt-6 border-t border-gray-200">
-          <div className="space-y-2">
-            <p className="text-gray-500 text-xs text-center">
-              Password changes take effect immediately. You will remain signed in.
-            </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-              <p className="text-blue-700 text-xs text-center">
-                💡 If you're having issues, try refreshing your session first
-              </p>
+          {/* Password Change Form */}
+          <form onSubmit={handlePasswordUpdate} className="space-y-3 sm:space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-gray-800 font-medium text-sm sm:text-base">Change Password</h3>
+              <button
+                type="button"
+                onClick={handleRefreshSession}
+                disabled={isUpdating || isUpgrading}
+                className="text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2 py-1 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Refresh Session
+              </button>
             </div>
-            {(isUpdating || isUpgrading) && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
-                <p className="text-amber-700 text-xs text-center">
-                  ⏳ Please wait while we process your request (max 30 seconds)
+            
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                New Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  disabled={isUpdating || isUpgrading}
+                  className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Enter new password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  disabled={isUpdating || isUpgrading}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
+                </button>
+              </div>
+              {newPassword && newPassword.length < 6 && (
+                <p className="text-xs text-amber-600 mt-1">Password must be at least 6 characters</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                Confirm New Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={isUpdating || isUpgrading}
+                  className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Confirm new password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  disabled={isUpdating || isUpgrading}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
+                </button>
+              </div>
+              {confirmPassword && newPassword && confirmPassword !== newPassword && (
+                <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
+              )}
+            </div>
+
+            {message && (
+              <div className={`p-3 rounded-lg border ${
+                message.type === 'success' 
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                  : message.type === 'info'
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-red-50 border-red-200 text-red-600'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {message.type === 'success' ? (
+                    <Check className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  ) : message.type === 'info' ? (
+                    <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 animate-spin" />
+                  ) : (
+                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  )}
+                  <span className="text-xs sm:text-sm">{message.text}</span>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isUpdating || isUpgrading || !isFormValid}
+              className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25 text-sm sm:text-base"
+            >
+              {isUpdating ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Updating Password...
+                </div>
+              ) : (
+                'Update Password'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-4 sm:mt-6 pt-3 sm:pt-6 border-t border-gray-200">
+            <div className="space-y-2">
+              <p className="text-gray-500 text-xs text-center">
+                Password changes take effect immediately. You will remain signed in.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                <p className="text-blue-700 text-xs text-center">
+                  💡 If you're having issues, try refreshing your session first
                 </p>
               </div>
-            )}
+              {(isUpdating || isUpgrading) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
+                  <p className="text-amber-700 text-xs text-center">
+                    ⏳ Please wait while we process your request (max 30 seconds)
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Password Change Confirmation Modal */}
+      <PasswordChangeConfirmation
+        isVisible={showPasswordConfirmation}
+        status={passwordChangeStatus}
+        errorMessage={passwordChangeError}
+        onBackToLogin={handleBackToLogin}
+        onRetry={handleRetryPasswordChange}
+      />
+    </>
   );
 }
