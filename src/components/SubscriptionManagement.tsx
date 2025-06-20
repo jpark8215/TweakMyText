@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download, Receipt, Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Crown, Calendar, CreditCard, AlertTriangle, Check, Zap, Star, Download, Receipt, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -35,8 +35,6 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
     isActive: true,
     willCancel: false
   });
-  const [rewritesSaved, setRewritesSaved] = useState<number>(0);
-  const [lastRewriteCheck, setLastRewriteCheck] = useState<Date | null>(null);
 
   const { user } = useAuth();
 
@@ -44,7 +42,6 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
     if (user) {
       loadBillingHistory();
       checkSubscriptionStatus();
-      checkRewriteHistory();
     }
   }, [user]);
 
@@ -90,37 +87,6 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       });
     } catch (error) {
       console.error('Error checking subscription status:', error);
-    }
-  };
-
-  const checkRewriteHistory = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('rewrite_history')
-        .select('id, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (error) {
-        console.error('Error checking rewrite history:', error);
-        return;
-      }
-
-      const { count } = await supabase
-        .from('rewrite_history')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      setRewritesSaved(count || 0);
-      
-      if (data && data.length > 0) {
-        setLastRewriteCheck(new Date(data[0].created_at));
-      }
-    } catch (error) {
-      console.error('Error checking rewrite history:', error);
     }
   };
 
@@ -319,42 +285,6 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         </div>
       )}
 
-      {/* Rewrite History Status */}
-      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-        <div className="flex items-center gap-3 mb-3">
-          <Shield className="w-5 h-5 text-blue-600" />
-          <h3 className="text-blue-800 font-medium">Rewrite History Status</h3>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="flex items-center gap-3">
-            <CheckCircle className="w-4 h-4 text-emerald-500" />
-            <div>
-              <p className="text-blue-800 font-medium">{rewritesSaved} Rewrites Saved</p>
-              <p className="text-blue-600 text-sm">All your rewrites are automatically saved</p>
-            </div>
-          </div>
-          {lastRewriteCheck && (
-            <div className="flex items-center gap-3">
-              <Calendar className="w-4 h-4 text-blue-500" />
-              <div>
-                <p className="text-blue-800 font-medium">Last Rewrite</p>
-                <p className="text-blue-600 text-sm">{lastRewriteCheck.toLocaleDateString()}</p>
-              </div>
-            </div>
-          )}
-        </div>
-        {user.subscription_tier === 'premium' && (
-          <div className="mt-3 p-3 bg-amber-100 border border-amber-200 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-amber-600" />
-              <p className="text-amber-800 text-sm font-medium">
-                Premium Benefit: Unlimited rewrite history with full analytics
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Current Plan */}
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200 p-6 sm:p-8 mb-8 shadow-lg">
         <div className="flex items-center gap-4 mb-6">
@@ -429,20 +359,6 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
             )}
           </div>
 
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex items-center gap-3 mb-2">
-              <Receipt className="w-5 h-5 text-purple-600" />
-              <span className="text-gray-800 font-medium">Rewrites Saved</span>
-            </div>
-            <p className="text-gray-600 text-sm mb-2">
-              {user.subscription_tier === 'premium' ? 'Unlimited history' : 'Last 30 days'}
-            </p>
-            <div className="flex items-center justify-between">
-              <p className="text-purple-600 text-lg font-bold">{rewritesSaved}</p>
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-            </div>
-          </div>
-
           {user.subscription_expires_at && (
             <div className="bg-gray-50 rounded-xl p-4">
               <div className="flex items-center gap-3 mb-2">
@@ -463,6 +379,17 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
               </div>
             </div>
           )}
+
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Check className="w-5 h-5 text-emerald-600" />
+              <span className="text-gray-800 font-medium">Status</span>
+            </div>
+            <p className="text-emerald-600 font-medium">Active</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Resets on day {user.monthly_reset_date}
+            </p>
+          </div>
         </div>
 
         {/* Plan Features */}
