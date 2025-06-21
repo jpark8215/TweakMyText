@@ -81,22 +81,26 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       // Calculate subscription status
       const isActive = user.subscription_tier !== 'free';
       
+      // Check if subscription has expired
+      const isCancelled = isActive && expiresAt && now > expiresAt;
+      
       // For demo purposes, simulate different cancellation states
       // In production, this would come from your payment provider (Stripe, etc.)
       const willCancel = localStorage.getItem(`subscription_cancelled_${user.id}`) === 'true';
-      const isCancelled = willCancel && expiresAt && now > expiresAt;
       
       let daysUntilCancellation = 0;
       if (willCancel && expiresAt) {
         daysUntilCancellation = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      } else if (isCancelled && expiresAt) {
+        daysUntilCancellation = Math.ceil((now.getTime() - expiresAt.getTime()) / (1000 * 60 * 60 * 24));
       }
       
       setSubscriptionStatus({
-        isActive,
-        willCancel,
+        isActive: isActive && !isCancelled,
+        willCancel: willCancel && !isCancelled,
         isCancelled,
-        cancelDate: willCancel ? expiresAt : undefined,
-        nextBillingDate: isActive && !willCancel ? expiresAt : undefined,
+        cancelDate: willCancel || isCancelled ? expiresAt : undefined,
+        nextBillingDate: isActive && !willCancel && !isCancelled ? expiresAt : undefined,
         gracePeriodEnd: willCancel ? expiresAt : undefined,
         daysUntilCancellation: Math.max(0, daysUntilCancellation),
         cancellationReason: willCancel ? localStorage.getItem(`cancellation_reason_${user.id}`) || 'User requested' : undefined
