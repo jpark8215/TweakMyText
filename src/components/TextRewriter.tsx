@@ -367,7 +367,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           </div>
         </div>
 
-        {/* Rewrite History Status - Only show when button is clicked */}
+        {/* Rewrite Summary< - Only show when button is clicked */}
         {showHistoryStats && (
           <div className="max-w-4xl mx-auto">
             <RewriteHistoryStats 
