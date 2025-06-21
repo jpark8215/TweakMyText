@@ -22,6 +22,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
   const [isRewriting, setIsRewriting] = useState(false);
   const [showToneControls, setShowToneControls] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showHistoryStats, setShowHistoryStats] = useState(false);
   const [toneSettings, setToneSettings] = useState<ToneSettings>({
     formality: 50,
     casualness: 50,
@@ -290,10 +291,11 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
             </p>
           </div>
           
-          {/* Controls - Centered */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full max-w-4xl">
+          {/* Centered Controls */}
+          <div className="flex flex-col items-center gap-4 w-full max-w-4xl">
+            {/* Token Display */}
             {user && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-white/80 rounded-lg border border-gray-200 text-sm">
+              <div className="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-lg border border-gray-200 text-sm">
                 <Zap className="w-4 h-4 text-amber-500" />
                 <span className="text-gray-800 font-medium">{formatTokens(user.tokens_remaining)}</span>
                 {user.subscription_tier === 'free' && (
@@ -309,10 +311,11 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
               </div>
             )}
             
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            {/* Control Buttons - Centered */}
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={() => setShowToneControls(!showToneControls)}
-                className="inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-white/80 hover:bg-white/90 text-gray-700 rounded-lg transition-all backdrop-blur-sm border border-gray-200 text-sm"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white/80 hover:bg-white/90 text-gray-700 rounded-lg transition-all backdrop-blur-sm border border-gray-200 text-sm"
               >
                 <Sliders className="w-4 h-4" />
                 <span>Tone Controls</span>
@@ -326,20 +329,37 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
 
               {/* History Access Button */}
               <button
-                onClick={() => setShowHistoryModal(true)}
-                className={`inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all text-sm ${
-                  hasHistoryAccess
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25'
-                    : 'bg-white/80 hover:bg-white/90 text-gray-700 border border-gray-200'
-                }`}
+                onClick={() => {
+                  if (hasHistoryAccess) {
+                    setShowHistoryStats(!showHistoryStats);
+                  } else {
+                    setShowHistoryModal(true);
+                  }
+                }}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white/80 hover:bg-white/90 text-gray-700 rounded-lg transition-all backdrop-blur-sm border border-gray-200 text-sm"
               >
                 <History className="w-4 h-4" />
                 <span>History</span>
                 {hasHistoryAccess && (
                   user.subscription_tier === 'premium' ? (
-                    <Star className="w-3 h-3" />
+                    <Star className="w-3 h-3 text-amber-500" />
                   ) : (
-                    <Crown className="w-3 h-3" />
+                    <Crown className="w-3 h-3 text-blue-500" />
+                  )
+                )}
+              </button>
+
+              <button
+                onClick={() => setShowHistoryModal(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white/80 hover:bg-white/90 text-gray-700 rounded-lg transition-all backdrop-blur-sm border border-gray-200 text-sm"
+              >
+                <History className="w-4 h-4" />
+                <span>View History</span>
+                {hasHistoryAccess && (
+                  user.subscription_tier === 'premium' ? (
+                    <Star className="w-3 h-3 text-amber-500" />
+                  ) : (
+                    <Crown className="w-3 h-3 text-blue-500" />
                   )
                 )}
               </button>
@@ -347,13 +367,15 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
           </div>
         </div>
 
-        {/* Rewrite History Status - Centered */}
-        <div className="max-w-4xl mx-auto">
-          <RewriteHistoryStats 
-            onOpenPricing={onOpenPricing}
-            refreshTrigger={statsRefreshTrigger}
-          />
-        </div>
+        {/* Rewrite History Status - Only show when button is clicked */}
+        {showHistoryStats && (
+          <div className="max-w-4xl mx-auto">
+            <RewriteHistoryStats 
+              onOpenPricing={onOpenPricing}
+              refreshTrigger={statsRefreshTrigger}
+            />
+          </div>
+        )}
 
         {/* Security Error Alert */}
         {securityError && (
