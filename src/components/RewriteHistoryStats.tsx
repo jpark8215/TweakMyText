@@ -139,7 +139,7 @@ export default function RewriteHistoryStats({ onOpenPricing, refreshTrigger }: R
           <BarChart3 className="w-4 h-4 text-white" />
         </div>
         <div>
-          <h3 className="text-blue-800 font-semibold text-base sm:text-lg">Rewrite History & Analytics</h3>
+          <h3 className="text-blue-800 font-semibold text-base sm:text-lg">Rewrite Summary</h3>
           <p className="text-blue-600 text-sm">Track your writing transformations and style evolution</p>
         </div>
       </div>
