@@ -47,6 +47,7 @@ export interface User {
   last_token_reset: string;
   monthly_reset_date: number;
   subscription_expires_at?: Date;
+  billing_start_date?: Date; // NEW: When paid subscription billing started
   created_at: Date;
 }
 

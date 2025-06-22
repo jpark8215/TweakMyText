@@ -130,6 +130,7 @@ export const useAuth = () => {
           monthly_exports_used: 0,
           last_token_reset: new Date().toISOString().split('T')[0],
           monthly_reset_date: new Date().getDate(),
+          billing_start_date: null, // No billing for free users
         };
 
         const { data: createdUser, error: createError } = await supabase
@@ -148,6 +149,9 @@ export const useAuth = () => {
           created_at: new Date(createdUser.created_at),
           subscription_expires_at: createdUser.subscription_expires_at 
             ? new Date(createdUser.subscription_expires_at) 
+            : undefined,
+          billing_start_date: createdUser.billing_start_date 
+            ? new Date(createdUser.billing_start_date) 
             : undefined,
         };
         
@@ -171,6 +175,9 @@ export const useAuth = () => {
           created_at: new Date(data.created_at),
           subscription_expires_at: data.subscription_expires_at 
             ? new Date(data.subscription_expires_at) 
+            : undefined,
+          billing_start_date: data.billing_start_date 
+            ? new Date(data.billing_start_date) 
             : undefined,
         };
         

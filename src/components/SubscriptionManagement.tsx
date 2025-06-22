@@ -27,6 +27,7 @@ interface SubscriptionStatus {
   gracePeriodEnd?: Date;
   daysUntilCancellation?: number;
   cancellationReason?: string;
+  billingStartDate?: Date;
 }
 
 export default function SubscriptionManagement({ onBack, onOpenPricing }: SubscriptionManagementProps) {
@@ -63,10 +64,10 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
     if (!user) return;
 
     try {
-      // Check if subscription is marked for cancellation
+      // Get user data including billing start date
       const { data, error } = await supabase
         .from('users')
-        .select('subscription_tier, subscription_expires_at, created_at')
+        .select('subscription_tier, subscription_expires_at, created_at, billing_start_date')
         .eq('id', user.id)
         .single();
 
@@ -77,7 +78,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
 
       const now = new Date();
       const expiresAt = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
-      const createdAt = data.created_at ? new Date(data.created_at) : null;
+      const billingStartDate = data.billing_start_date ? new Date(data.billing_start_date) : null;
       
       // Calculate subscription status
       const isActive = user.subscription_tier !== 'free';
@@ -88,15 +89,25 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       // Check for cancellation flag
       const willCancel = localStorage.getItem(`subscription_cancelled_${user.id}`) === 'true';
       
-      // Calculate next billing date (monthly from creation date)
+      // Calculate next billing date based on billing start date
       let nextBillingDate: Date | undefined;
-      if (isActive && !willCancel && !hasExpired && createdAt) {
-        const nextBilling = new Date(createdAt);
-        // Add months until we get a future date
-        while (nextBilling <= now) {
-          nextBilling.setMonth(nextBilling.getMonth() + 1);
+      if (isActive && !willCancel && !hasExpired) {
+        if (billingStartDate) {
+          // Use billing start date for Pro/Premium users
+          const nextBilling = new Date(billingStartDate);
+          // Add months until we get a future date
+          while (nextBilling <= now) {
+            nextBilling.setMonth(nextBilling.getMonth() + 1);
+          }
+          nextBillingDate = nextBilling;
+        } else {
+          // Fallback to creation date if no billing start date
+          const nextBilling = new Date(data.created_at);
+          while (nextBilling <= now) {
+            nextBilling.setMonth(nextBilling.getMonth() + 1);
+          }
+          nextBillingDate = nextBilling;
         }
-        nextBillingDate = nextBilling;
       }
       
       let daysUntilCancellation = 0;
@@ -118,7 +129,8 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         nextBillingDate,
         gracePeriodEnd: willCancel ? expiresAt : undefined,
         daysUntilCancellation: Math.max(0, daysUntilCancellation),
-        cancellationReason: willCancel ? localStorage.getItem(`cancellation_reason_${user.id}`) || 'User requested' : undefined
+        cancellationReason: willCancel ? localStorage.getItem(`cancellation_reason_${user.id}`) || 'User requested' : undefined,
+        billingStartDate
       });
     } catch (error) {
       console.error('Error checking subscription status:', error);
@@ -172,14 +184,28 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
   const handleCancelSubscription = async () => {
     setIsProcessing(true);
     try {
-      // Calculate cancellation date (end of current billing period)
-      const createdAt = user.created_at;
-      const now = new Date();
-      const cancelDate = new Date(createdAt);
+      // Calculate cancellation date based on billing start date or next billing cycle
+      let cancelDate: Date;
       
-      // Find the next billing date after creation
-      while (cancelDate <= now) {
-        cancelDate.setMonth(cancelDate.getMonth() + 1);
+      if (subscriptionStatus.billingStartDate) {
+        // Use billing start date for Pro/Premium users
+        cancelDate = new Date(subscriptionStatus.billingStartDate);
+        const now = new Date();
+        
+        // Find the next billing date after now
+        while (cancelDate <= now) {
+          cancelDate.setMonth(cancelDate.getMonth() + 1);
+        }
+      } else {
+        // Fallback to user creation date
+        const createdAt = user.created_at;
+        const now = new Date();
+        cancelDate = new Date(createdAt);
+        
+        // Find the next billing date after creation
+        while (cancelDate <= now) {
+          cancelDate.setMonth(cancelDate.getMonth() + 1);
+        }
       }
       
       // Update subscription expiration date in database
@@ -198,7 +224,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
       localStorage.setItem(`cancellation_reason_${user.id}`, 'User requested cancellation');
       
       // Update subscription status to show cancellation
-      const daysUntilCancellation = Math.ceil((cancelDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      const daysUntilCancellation = Math.ceil((cancelDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
       
       setSubscriptionStatus({
         ...subscriptionStatus,
@@ -232,15 +258,18 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
   const handleReactivateSubscription = async () => {
     setIsProcessing(true);
     try {
-      // Calculate next billing date from today
+      // Calculate next billing date from today (new billing cycle starts now)
       const now = new Date();
       const nextBilling = new Date(now);
       nextBilling.setMonth(nextBilling.getMonth() + 1);
       
-      // Update subscription expiration date in database
+      // Update subscription expiration date and billing start date in database
       const { error } = await supabase
         .from('users')
-        .update({ subscription_expires_at: nextBilling.toISOString() })
+        .update({ 
+          subscription_expires_at: nextBilling.toISOString(),
+          billing_start_date: now.toISOString() // Reset billing start date to now
+        })
         .eq('id', user.id);
       
       if (error) {
@@ -258,7 +287,8 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         isCancelled: false,
         cancelDate: undefined,
         cancellationReason: undefined,
-        nextBillingDate: nextBilling
+        nextBillingDate: nextBilling,
+        billingStartDate: now
       });
       
       alert('✅ Subscription reactivated successfully! Your premium features will continue uninterrupted.');
@@ -433,6 +463,11 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
               <p className="text-emerald-700 text-sm">
                 Your {tierInfo.name} subscription is active and will renew on{' '}
                 {subscriptionStatus.nextBillingDate?.toLocaleDateString() || 'your next billing date'}.
+                {subscriptionStatus.billingStartDate && (
+                  <span className="block mt-1 text-xs">
+                    Billing cycle started: {subscriptionStatus.billingStartDate.toLocaleDateString()}
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -519,7 +554,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
             )}
           </div>
 
-          {user.subscription_expires_at && (
+          {subscriptionStatus.nextBillingDate && (
             <div className="bg-gray-50 rounded-xl p-4">
               <div className="flex items-center gap-3 mb-2">
                 <Calendar className="w-5 h-5 text-indigo-600" />
@@ -528,7 +563,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
                 </span>
               </div>
               <p className="text-gray-600 text-sm">
-                {subscriptionStatus.nextBillingDate?.toLocaleDateString() || user.subscription_expires_at.toLocaleDateString()}
+                {subscriptionStatus.nextBillingDate.toLocaleDateString()}
               </p>
               <div className="flex items-center justify-between mt-2">
                 <span className={`text-sm font-medium ${
@@ -560,7 +595,10 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
                subscriptionStatus.willCancel ? 'Ending Soon' : 'Active'}
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              Resets on day {user.monthly_reset_date}
+              {user.subscription_tier === 'free' 
+                ? `Resets on day ${user.monthly_reset_date}`
+                : 'Monthly billing cycle'
+              }
             </p>
           </div>
         </div>
