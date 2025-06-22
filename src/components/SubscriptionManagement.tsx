@@ -77,30 +77,45 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
 
       const now = new Date();
       const expiresAt = data.subscription_expires_at ? new Date(data.subscription_expires_at) : null;
+      const createdAt = data.created_at ? new Date(data.created_at) : null;
       
       // Calculate subscription status
       const isActive = user.subscription_tier !== 'free';
       
-      // Check if subscription has expired
-      const isCancelled = isActive && expiresAt && now > expiresAt;
+      // Check if subscription has expired based on expiration date
+      const hasExpired = expiresAt && now > expiresAt;
       
-      // For demo purposes, simulate different cancellation states
-      // In production, this would come from your payment provider (Stripe, etc.)
+      // Check for cancellation flag
       const willCancel = localStorage.getItem(`subscription_cancelled_${user.id}`) === 'true';
       
+      // Calculate next billing date (monthly from creation date)
+      let nextBillingDate: Date | undefined;
+      if (isActive && !willCancel && !hasExpired && createdAt) {
+        const nextBilling = new Date(createdAt);
+        // Add months until we get a future date
+        while (nextBilling <= now) {
+          nextBilling.setMonth(nextBilling.getMonth() + 1);
+        }
+        nextBillingDate = nextBilling;
+      }
+      
       let daysUntilCancellation = 0;
+      let cancelDate: Date | undefined;
+      
       if (willCancel && expiresAt) {
+        cancelDate = expiresAt;
         daysUntilCancellation = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      } else if (isCancelled && expiresAt) {
+      } else if (hasExpired && expiresAt) {
+        cancelDate = expiresAt;
         daysUntilCancellation = Math.ceil((now.getTime() - expiresAt.getTime()) / (1000 * 60 * 60 * 24));
       }
       
       setSubscriptionStatus({
-        isActive: isActive && !isCancelled,
-        willCancel: willCancel && !isCancelled,
-        isCancelled,
-        cancelDate: willCancel || isCancelled ? expiresAt : undefined,
-        nextBillingDate: isActive && !willCancel && !isCancelled ? expiresAt : undefined,
+        isActive: isActive && !hasExpired,
+        willCancel: willCancel && !hasExpired,
+        isCancelled: hasExpired || (isActive && hasExpired),
+        cancelDate,
+        nextBillingDate,
         gracePeriodEnd: willCancel ? expiresAt : undefined,
         daysUntilCancellation: Math.max(0, daysUntilCancellation),
         cancellationReason: willCancel ? localStorage.getItem(`cancellation_reason_${user.id}`) || 'User requested' : undefined
@@ -157,16 +172,32 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
   const handleCancelSubscription = async () => {
     setIsProcessing(true);
     try {
-      // In a real app, this would call your backend to cancel the subscription
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+      // Calculate cancellation date (end of current billing period)
+      const createdAt = user.created_at;
+      const now = new Date();
+      const cancelDate = new Date(createdAt);
+      
+      // Find the next billing date after creation
+      while (cancelDate <= now) {
+        cancelDate.setMonth(cancelDate.getMonth() + 1);
+      }
+      
+      // Update subscription expiration date in database
+      const { error } = await supabase
+        .from('users')
+        .update({ subscription_expires_at: cancelDate.toISOString() })
+        .eq('id', user.id);
+      
+      if (error) {
+        console.error('Error updating subscription expiration:', error);
+        throw error;
+      }
       
       // Store cancellation in localStorage for demo
       localStorage.setItem(`subscription_cancelled_${user.id}`, 'true');
       localStorage.setItem(`cancellation_reason_${user.id}`, 'User requested cancellation');
       
       // Update subscription status to show cancellation
-      const cancelDate = user.subscription_expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-      const now = new Date();
       const daysUntilCancellation = Math.ceil((cancelDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       
       setSubscriptionStatus({
@@ -201,8 +232,21 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
   const handleReactivateSubscription = async () => {
     setIsProcessing(true);
     try {
-      // In a real app, this would call your backend to reactivate
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Calculate next billing date from today
+      const now = new Date();
+      const nextBilling = new Date(now);
+      nextBilling.setMonth(nextBilling.getMonth() + 1);
+      
+      // Update subscription expiration date in database
+      const { error } = await supabase
+        .from('users')
+        .update({ subscription_expires_at: nextBilling.toISOString() })
+        .eq('id', user.id);
+      
+      if (error) {
+        console.error('Error reactivating subscription:', error);
+        throw error;
+      }
       
       // Remove cancellation from localStorage for demo
       localStorage.removeItem(`subscription_cancelled_${user.id}`);
@@ -214,7 +258,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
         isCancelled: false,
         cancelDate: undefined,
         cancellationReason: undefined,
-        nextBillingDate: user.subscription_expires_at
+        nextBillingDate: nextBilling
       });
       
       alert('✅ Subscription reactivated successfully! Your premium features will continue uninterrupted.');
@@ -484,7 +528,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
                 </span>
               </div>
               <p className="text-gray-600 text-sm">
-                {user.subscription_expires_at.toLocaleDateString()}
+                {subscriptionStatus.nextBillingDate?.toLocaleDateString() || user.subscription_expires_at.toLocaleDateString()}
               </p>
               <div className="flex items-center justify-between mt-2">
                 <span className={`text-sm font-medium ${
@@ -642,7 +686,7 @@ export default function SubscriptionManagement({ onBack, onOpenPricing }: Subscr
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <h4 className="text-amber-800 font-medium text-sm mb-2">What happens when you cancel:</h4>
                 <ul className="text-amber-700 text-sm space-y-1">
-                  <li>• Your subscription will remain active until {user.subscription_expires_at?.toLocaleDateString()}</li>
+                  <li>• Your subscription will remain active until the end of your current billing period</li>
                   <li>• All your saved rewrites and writing samples will be preserved</li>
                   <li>• You can reactivate anytime before the end date</li>
                   <li>• After cancellation, you'll be moved to the free plan</li>
