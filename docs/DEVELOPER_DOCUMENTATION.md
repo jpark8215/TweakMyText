@@ -44,7 +44,7 @@ TweakMyText is a sophisticated AI-powered writing style rewriter that learns fro
 - Export functionality with tier-specific data access
 
 ### 5. **Subscription Management**
-- Clear subscription status indicators
+- Clear subscription status indicators with cancellation tracking
 - Cancellation with grace period management
 - Billing history and usage analytics
 - Reactivation capabilities
@@ -153,9 +153,10 @@ CREATE POLICY "Users can read own writing samples"
 - Real-time save status with error handling
 
 #### `TextRewriter.tsx`
-- Main rewriting interface with tone controls
+- Main rewriting interface with centered, responsive layout
 - Token usage validation and real-time feedback
-- Rewrite history integration for Pro/Premium users
+- Progressive disclosure for rewrite summary and history
+- Consistent button styling across all controls
 
 #### `ToneControls.tsx`
 - Subscription-based tone adjustment interface
@@ -163,9 +164,15 @@ CREATE POLICY "Users can read own writing samples"
 - Preset management and custom fine-tuning
 
 #### `SubscriptionManagement.tsx`
-- Comprehensive subscription status display
+- Comprehensive subscription status display with proper cancellation tracking
 - Cancellation and reactivation workflows
 - Billing history and usage analytics
+- Enhanced status detection for expired subscriptions
+
+#### `RewriteHistoryStats.tsx`
+- Renamed from "Rewrite History & Analytics" to "Rewrite Summary"
+- Shows only when explicitly requested via button click
+- Subscription-aware analytics display
 
 ### Authentication & Security
 
@@ -227,7 +234,7 @@ const updateTokens = async (tokensUsed: number) => {
 The system tracks detailed subscription status including:
 - **Active subscriptions** with next billing dates
 - **Cancelled subscriptions** with grace periods
-- **Expired subscriptions** with reactivation options
+- **Expired subscriptions** with proper detection and reactivation options
 - **Billing history** with payment status tracking
 
 ## AI Integration
@@ -310,6 +317,18 @@ export const logSecurityEvent = async (event: SecurityEvent): Promise<void> => {
   });
 };
 ```
+
+## UI/UX Design Principles
+
+### Responsive Layout
+- **Centered Design**: All main controls (tokens, tone controls, rewrite summary) are centered regardless of screen size
+- **Progressive Disclosure**: Information is revealed only when needed (e.g., rewrite summary appears only when button is clicked)
+- **Consistent Styling**: All buttons use consistent white/gray styling with proper hover states
+
+### User Experience
+- **Clear Status Indicators**: Subscription status, cancellation tracking, and expiration dates are prominently displayed
+- **Intuitive Navigation**: Logical flow from style capture to rewriting to history management
+- **Accessibility**: Proper contrast ratios, keyboard navigation, and screen reader support
 
 ## Development Setup
 
@@ -439,6 +458,11 @@ Resets monthly token usage on user anniversary dates.
 - Check RLS policies on rewrite_history table
 - Verify user authentication state
 - Check for database connection issues
+
+#### Subscription Status Issues
+- Verify subscription expiration date handling
+- Check cancellation status detection logic
+- Ensure proper grace period calculations
 
 ### Debug Tools
 - Browser developer tools for client-side debugging
