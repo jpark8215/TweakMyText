@@ -37,17 +37,19 @@ TweakMyText is a sophisticated AI-powered writing style rewriter that learns fro
 - Daily and monthly token limits with automatic resets
 - Real-time usage tracking and validation
 - Comprehensive security logging and audit trails
+- **Billing-based resets**: Pro/Premium users get monthly resets based on billing start date, not user creation date
 
 ### 4. **Rewrite History & Analytics**
 - Pro/Premium users get access to rewrite history
 - Premium users get advanced analytics and insights
 - Export functionality with tier-specific data access
+- **Progressive disclosure**: Rewrite summary shown only when requested
 
 ### 5. **Subscription Management**
-- Clear subscription status indicators with cancellation tracking
-- Cancellation with grace period management
+- Clear subscription status indicators with proper cancellation tracking
+- Cancellation with grace period management based on billing cycles
 - Billing history and usage analytics
-- Reactivation capabilities
+- Reactivation capabilities with new billing cycle initialization
 
 ## Database Schema
 
@@ -66,6 +68,7 @@ CREATE TABLE users (
   last_token_reset date DEFAULT CURRENT_DATE,
   monthly_reset_date integer DEFAULT EXTRACT(day FROM CURRENT_DATE),
   subscription_expires_at timestamptz,
+  billing_start_date timestamptz, -- NEW: When paid subscription billing started
   created_at timestamptz DEFAULT now()
 );
 ```
@@ -165,7 +168,7 @@ CREATE POLICY "Users can read own writing samples"
 
 #### `SubscriptionManagement.tsx`
 - Comprehensive subscription status display with proper cancellation tracking
-- Cancellation and reactivation workflows
+- Cancellation and reactivation workflows based on billing cycles
 - Billing history and usage analytics
 - Enhanced status detection for expired subscriptions
 
@@ -178,7 +181,7 @@ CREATE POLICY "Users can read own writing samples"
 
 #### `useAuth.ts`
 - Centralized authentication state management
-- Token usage tracking and validation
+- Token usage tracking and validation with billing-based resets
 - Enhanced error handling and user feedback
 - Rewrite history saving with comprehensive logging
 
@@ -206,10 +209,18 @@ CREATE POLICY "Users can read own writing samples"
 ### Token Management
 
 ```typescript
-// Token usage validation
+// Token usage validation with billing-based resets
 const updateTokens = async (tokensUsed: number) => {
   // Check subscription limits
   const limits = getSubscriptionLimits(user);
+  
+  // For Pro/Premium: Check if monthly reset is due based on billing cycle
+  if (user.subscription_tier !== 'free') {
+    const shouldReset = await supabase.rpc('should_reset_monthly_tokens', { p_user_id: user.id });
+    if (shouldReset) {
+      await supabase.rpc('reset_monthly_tokens');
+    }
+  }
   
   // Validate daily/monthly limits
   if (user.subscription_tier === 'free' && user.daily_tokens_used >= limits.dailyLimit) {
@@ -232,10 +243,26 @@ const updateTokens = async (tokensUsed: number) => {
 ### Subscription Status Management
 
 The system tracks detailed subscription status including:
-- **Active subscriptions** with next billing dates
-- **Cancelled subscriptions** with grace periods
+- **Active subscriptions** with next billing dates calculated from billing start date
+- **Cancelled subscriptions** with grace periods ending at next billing cycle
 - **Expired subscriptions** with proper detection and reactivation options
 - **Billing history** with payment status tracking
+
+### Billing Cycle Management
+
+#### Key Functions
+
+- `get_next_billing_date(user_id)`: Calculates next billing based on billing start date
+- `should_reset_monthly_tokens(user_id)`: Determines if monthly reset is due based on billing cycles
+- `update_subscription_tier(user_id, tier, billing_start)`: Handles tier changes with proper billing date tracking
+
+#### How It Works
+
+1. **Free Users**: Continue using user creation date for monthly resets (day of month)
+2. **Pro/Premium Users**: Use billing start date for monthly token resets
+3. **New Subscriptions**: Billing start date is set when upgrading to paid tier
+4. **Cancellations**: End at next billing date calculated from billing start
+5. **Reactivations**: Start new billing cycle from reactivation date
 
 ## AI Integration
 
@@ -329,6 +356,11 @@ export const logSecurityEvent = async (event: SecurityEvent): Promise<void> => {
 - **Clear Status Indicators**: Subscription status, cancellation tracking, and expiration dates are prominently displayed
 - **Intuitive Navigation**: Logical flow from style capture to rewriting to history management
 - **Accessibility**: Proper contrast ratios, keyboard navigation, and screen reader support
+
+### Button Layout
+- **Centered Controls**: Tone controls, rewrite summary, and view history buttons are centered
+- **Consistent Styling**: All control buttons use white/gray background with proper hover states
+- **Clear Hierarchy**: Primary actions (rewrite) use gradient backgrounds, secondary actions use neutral colors
 
 ## Development Setup
 
@@ -434,11 +466,20 @@ FROM rewrite_history
 WHERE user_id = p_user_id;
 ```
 
+#### `get_next_billing_date(p_user_id uuid)`
+Calculates next billing date based on billing start date for Pro/Premium users.
+
+#### `should_reset_monthly_tokens(p_user_id uuid)`
+Determines if monthly token reset is due based on billing cycles.
+
 #### `reset_daily_tokens()`
-Resets daily token usage for users when appropriate.
+Resets daily token usage for free users when appropriate.
 
 #### `reset_monthly_tokens()`
-Resets monthly token usage on user anniversary dates.
+Resets monthly token usage based on billing cycles (Pro/Premium) or user anniversary dates (Free).
+
+#### `update_subscription_tier(user_id, tier, billing_start)`
+Handles subscription tier changes with proper billing date tracking.
 
 ## Troubleshooting
 
@@ -450,7 +491,7 @@ Resets monthly token usage on user anniversary dates.
 - Ensure user profile creation triggers are working
 
 #### Token Limit Issues
-- Verify token reset functions are running
+- Verify token reset functions are running with correct billing cycles
 - Check subscription tier calculations
 - Validate usage tracking accuracy
 
@@ -460,9 +501,9 @@ Resets monthly token usage on user anniversary dates.
 - Check for database connection issues
 
 #### Subscription Status Issues
-- Verify subscription expiration date handling
+- Verify subscription expiration date handling based on billing cycles
 - Check cancellation status detection logic
-- Ensure proper grace period calculations
+- Ensure proper grace period calculations based on billing start dates
 
 ### Debug Tools
 - Browser developer tools for client-side debugging
