@@ -218,19 +218,38 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
   };
 
   const handleBackToLogin = async () => {
+    console.log('Settings: Handling back to login after password change');
     try {
-      await signOut();
+      // First close all modals
+      setShowPasswordConfirmation(false);
+      setPasswordChangeStatus(null);
+      setPasswordChangeError('');
       handleClose();
+      
+      // Then sign out
+      console.log('Settings: Signing out user...');
+      const { error } = await signOut();
+      if (error) {
+        console.error('Sign out error during password change flow:', error);
+      } else {
+        console.log('Settings: User signed out successfully after password change');
+      }
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('Error during back to login flow:', error);
+      // Even if there's an error, close the modals
+      setShowPasswordConfirmation(false);
+      setPasswordChangeStatus(null);
+      setPasswordChangeError('');
       handleClose();
     }
   };
 
   const handleRetryPasswordChange = () => {
+    console.log('Settings: Retrying password change');
     setShowPasswordConfirmation(false);
     setPasswordChangeStatus(null);
     setPasswordChangeError('');
+    setIsUpdating(false);
   };
 
   const isFormValid = newPassword.length >= 6 && 

@@ -18,6 +18,7 @@ export default function PasswordChangeConfirmation({
 }: PasswordChangeConfirmationProps) {
   const [countdown, setCountdown] = useState(3);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Handle success countdown and redirect
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function PasswordChangeConfirmation({
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            onBackToLogin();
+            handleBackToLogin();
             return 0;
           }
           return prev - 1;
@@ -39,7 +40,27 @@ export default function PasswordChangeConfirmation({
       setCountdown(3);
       setIsRedirecting(false);
     }
-  }, [status, isVisible, onBackToLogin]);
+  }, [status, isVisible]);
+
+  const handleBackToLogin = async () => {
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
+    try {
+      console.log('Password change confirmation: Navigating back to login');
+      await onBackToLogin();
+    } catch (error) {
+      console.error('Error during back to login:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (onRetry) {
+      onRetry();
+    }
+  };
 
   if (!isVisible) return null;
 
@@ -65,18 +86,32 @@ export default function PasswordChangeConfirmation({
               <div className="flex items-center justify-center gap-2 text-emerald-700">
                 <Shield className="w-4 h-4" />
                 <span className="text-sm font-medium">
-                  Redirecting to login in {countdown} second{countdown !== 1 ? 's' : ''}...
+                  {isRedirecting ? (
+                    `Redirecting to login in ${countdown} second${countdown !== 1 ? 's' : ''}...`
+                  ) : (
+                    'Ready to sign in with your new password'
+                  )}
                 </span>
               </div>
             </div>
 
             <div className="flex gap-3">
               <button
-                onClick={onBackToLogin}
-                className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-xl font-medium hover:from-emerald-600 hover:to-green-600 transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/25"
+                onClick={handleBackToLogin}
+                disabled={isProcessing}
+                className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-xl font-medium hover:from-emerald-600 hover:to-green-600 transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <LogIn className="w-4 h-4 inline mr-2" />
-                Go to Login Now
+                {isProcessing ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Signing out...
+                  </div>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4 inline mr-2" />
+                    Go to Login Now
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -136,7 +171,7 @@ export default function PasswordChangeConfirmation({
             <div className="flex flex-col sm:flex-row gap-3">
               {onRetry && (
                 <button
-                  onClick={onRetry}
+                  onClick={handleRetry}
                   className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition-all transform hover:scale-105 shadow-lg shadow-blue-500/25"
                 >
                   <RefreshCw className="w-4 h-4 inline mr-2" />
@@ -145,11 +180,21 @@ export default function PasswordChangeConfirmation({
               )}
               
               <button
-                onClick={onBackToLogin}
-                className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all border border-gray-200"
+                onClick={handleBackToLogin}
+                disabled={isProcessing}
+                className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <ArrowLeft className="w-4 h-4 inline mr-2" />
-                Back to Login
+                {isProcessing ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
+                    Signing out...
+                  </div>
+                ) : (
+                  <>
+                    <ArrowLeft className="w-4 h-4 inline mr-2" />
+                    Back to Login
+                  </>
+                )}
               </button>
             </div>
           </div>
