@@ -54,7 +54,8 @@ Check your `package.json` file:
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest"
   }
 }
 ```
@@ -375,6 +376,555 @@ sudo apt-get install -y nodejs
 brew install node@18
 ```
 
+## Issue 8: Password Change Functionality
+
+### Symptoms
+- Password change appears to time out but actually succeeds
+- "Back to Login" button doesn't work after password change
+- User remains logged in after password change
+
+### Diagnostic Steps
+
+#### Step 1: Check Password Change Flow
+```bash
+# Look for race conditions in password update logic
+grep -r "updateUser" src/
+grep -r "setPasswordChangeStatus" src/
+```
+
+#### Step 2: Verify Timeout Handling
+```bash
+# Check for proper timeout handling
+grep -r "setTimeout" src/components/SettingsModal.tsx
+grep -r "clearTimeout" src/components/SettingsModal.tsx
+```
+
+#### Step 3: Check AbortController Usage
+```bash
+# Verify proper AbortController implementation
+grep -r "AbortController" src/
+grep -r "abortController.signal" src/
+```
+
+### Common Fixes
+
+1. **Implement Proper AbortController**
+   ```typescript
+   // Create an AbortController to handle cancellation
+   const abortController = new AbortController();
+   let timeoutId: NodeJS.Timeout | null = null;
+   let updateCompleted = false;
+
+   try {
+     // Set a timeout that can be cancelled
+     timeoutId = setTimeout(() => {
+       if (!updateCompleted) {
+         abortController.abort();
+         setPasswordChangeStatus('error');
+         setPasswordChangeError('Password update timed out. Please try again.');
+       }
+     }, 30000); // 30 second timeout
+
+     // Use abort signal with fetch if applicable
+     const response = await fetch(url, { signal: abortController.signal });
+
+     // Mark update as completed to prevent timeout
+     updateCompleted = true;
+     
+     // Clear timeout since we got a response
+     if (timeoutId) {
+       clearTimeout(timeoutId);
+       timeoutId = null;
+     }
+   } catch (error) {
+     // Handle errors
+   } finally {
+     // Ensure timeout is cleared
+     if (timeoutId) {
+       clearTimeout(timeoutId);
+     }
+   }
+   ```
+
+2. **Fix "Back to Login" Functionality**
+   ```typescript
+   const handleBackToLogin = async () => {
+     console.log('Settings: Handling back to login after password change');
+     try {
+       // First close all modals
+       setShowPasswordConfirmation(false);
+       setPasswordChangeStatus(null);
+       setPasswordChangeError('');
+       handleClose();
+       
+       // Then sign out
+       console.log('Settings: Signing out user...');
+       const { error } = await signOut();
+       if (error) {
+         console.error('Sign out error during password change flow:', error);
+       } else {
+         console.log('Settings: User signed out successfully after password change');
+       }
+     } catch (error) {
+       console.error('Error during back to login flow:', error);
+       // Even if there's an error, close the modals
+       setShowPasswordConfirmation(false);
+       setPasswordChangeStatus(null);
+       setPasswordChangeError('');
+       handleClose();
+     }
+   };
+   ```
+
+3. **Prevent State Updates After Unmount**
+   ```typescript
+   // Use a mounted ref to prevent state updates after unmount
+   const mountedRef = useRef(true);
+
+   useEffect(() => {
+     return () => {
+       mountedRef.current = false;
+     };
+   }, []);
+
+   // Only update state if component is still mounted
+   if (mountedRef.current) {
+     setPasswordChangeStatus('success');
+   }
+   ```
+
+## Issue 9: Memory Leaks in React Components
+
+### Symptoms
+- Console warnings about memory leaks
+- State updates on unmounted components
+- Performance degradation over time
+
+### Diagnostic Steps
+
+#### Step 1: Check for Cleanup in useEffect
+```bash
+# Look for useEffect without cleanup
+grep -r "useEffect" --include="*.tsx" src/ | grep -v "return"
+```
+
+#### Step 2: Check for Subscription Handling
+```bash
+# Check for proper subscription cleanup
+grep -r "subscribe" --include="*.tsx" src/
+grep -r "unsubscribe" --include="*.tsx" src/
+```
+
+### Common Fixes
+
+1. **Add Mounted Ref for Async Operations**
+   ```typescript
+   const mountedRef = useRef(true);
+
+   useEffect(() => {
+     // Set to true when component mounts
+     mountedRef.current = true;
+     
+     // Async operation
+     const fetchData = async () => {
+       try {
+         const result = await someAsyncOperation();
+         // Only update state if still mounted
+         if (mountedRef.current) {
+           setData(result);
+         }
+       } catch (error) {
+         if (mountedRef.current) {
+           setError(error);
+         }
+       }
+     };
+     
+     fetchData();
+     
+     // Cleanup function
+     return () => {
+       mountedRef.current = false;
+     };
+   }, []);
+   ```
+
+2. **Proper Subscription Handling**
+   ```typescript
+   useEffect(() => {
+     const subscription = someService.subscribe(data => {
+       // Handle data
+     });
+     
+     // Return cleanup function
+     return () => {
+       subscription.unsubscribe();
+     };
+   }, []);
+   ```
+
+3. **Cancel Fetch Requests**
+   ```typescript
+   useEffect(() => {
+     const abortController = new AbortController();
+     
+     fetch(url, { signal: abortController.signal })
+       .then(response => response.json())
+       .then(data => {
+         setData(data);
+       })
+       .catch(error => {
+         if (error.name !== 'AbortError') {
+           setError(error);
+         }
+       });
+     
+     return () => {
+       abortController.abort();
+     };
+   }, [url]);
+   ```
+
+## Issue 10: Performance Optimization
+
+### Symptoms
+- Slow rendering, especially with large lists
+- UI lag when interacting with controls
+- High memory usage
+
+### Diagnostic Steps
+
+#### Step 1: Check for Unnecessary Re-renders
+```bash
+# Look for components without memoization
+grep -r "export default function" --include="*.tsx" src/
+```
+
+#### Step 2: Check for Expensive Calculations
+```bash
+# Look for expensive operations in render
+grep -r "filter\|map\|reduce\|sort" --include="*.tsx" src/
+```
+
+### Common Fixes
+
+1. **Memoize Components with React.memo**
+   ```typescript
+   import React, { memo } from 'react';
+
+   const MyComponent = memo(({ prop1, prop2 }) => {
+     // Component logic
+     return (
+       <div>{prop1} {prop2}</div>
+     );
+   });
+
+   export default MyComponent;
+   ```
+
+2. **Use useCallback for Event Handlers**
+   ```typescript
+   const handleClick = useCallback(() => {
+     // Handler logic
+   }, [dependencies]);
+   ```
+
+3. **Use useMemo for Expensive Calculations**
+   ```typescript
+   const filteredItems = useMemo(() => {
+     return items.filter(item => item.matches(searchTerm));
+   }, [items, searchTerm]);
+   ```
+
+4. **Implement Virtualization for Long Lists**
+   ```bash
+   # Install react-window
+   npm install react-window
+
+   # Use for long lists
+   import { FixedSizeList } from 'react-window';
+
+   const Row = ({ index, style }) => (
+     <div style={style}>Item {index}</div>
+   );
+
+   const MyList = () => (
+     <FixedSizeList
+       height={500}
+       width={300}
+       itemCount={10000}
+       itemSize={35}
+     >
+       {Row}
+     </FixedSizeList>
+   );
+   ```
+
+5. **Implement Pagination for Data Loading**
+   ```typescript
+   const [page, setPage] = useState(0);
+   const [hasMore, setHasMore] = useState(true);
+   const pageSize = 20;
+
+   const loadData = async (newPage = 0) => {
+     const start = newPage * pageSize;
+     const end = start + pageSize - 1;
+     
+     const { data, count } = await fetchData(start, end);
+     
+     if (newPage === 0) {
+       setItems(data);
+     } else {
+       setItems(prev => [...prev, ...data]);
+     }
+     
+     setPage(newPage);
+     setHasMore(data.length === pageSize);
+   };
+
+   const loadMore = () => {
+     if (hasMore) {
+       loadData(page + 1);
+     }
+   };
+   ```
+
+## Issue 11: Testing Setup and Execution
+
+### Symptoms
+- Tests fail to run
+- Test coverage is low
+- Tests pass locally but fail in CI
+
+### Diagnostic Steps
+
+#### Step 1: Check Testing Configuration
+```bash
+# Check Vitest configuration
+cat vitest.config.ts
+
+# Check test scripts in package.json
+grep -A 5 "\"test\"" package.json
+```
+
+#### Step 2: Verify Test Dependencies
+```bash
+# Check if testing libraries are installed
+npm list @testing-library/react
+npm list @testing-library/jest-dom
+npm list vitest
+```
+
+### Common Fixes
+
+1. **Set Up Proper Vitest Configuration**
+   ```typescript
+   // vitest.config.ts
+   import { defineConfig } from 'vitest/config';
+   import react from '@vitejs/plugin-react';
+
+   export default defineConfig({
+     plugins: [react()],
+     test: {
+       environment: 'jsdom',
+       globals: true,
+       coverage: {
+         reporter: ['text', 'json', 'html'],
+         exclude: ['node_modules/', 'src/vite-env.d.ts']
+       }
+     }
+   });
+   ```
+
+2. **Install Required Testing Dependencies**
+   ```bash
+   npm install --save-dev @testing-library/react @testing-library/jest-dom @testing-library/user-event vitest jsdom
+   ```
+
+3. **Add Test Setup File**
+   ```typescript
+   // src/test/setup.ts
+   import '@testing-library/jest-dom';
+   
+   // Add any global test setup here
+   ```
+
+4. **Write Basic Component Tests**
+   ```typescript
+   // src/__tests__/Component.test.tsx
+   import { describe, it, expect } from 'vitest';
+   import { render, screen } from '@testing-library/react';
+   import Component from '../components/Component';
+
+   describe('Component', () => {
+     it('renders correctly', () => {
+       render(<Component />);
+       expect(screen.getByText('Expected Text')).toBeInTheDocument();
+     });
+   });
+   ```
+
+5. **Add Test Coverage Script**
+   ```json
+   // package.json
+   {
+     "scripts": {
+       "test": "vitest",
+       "test:coverage": "vitest run --coverage"
+     }
+   }
+   ```
+
+## Issue 12: Password Change Timeout Issues
+
+### Symptoms
+- Password change appears to time out but actually succeeds
+- User gets "Password update timed out" message even though password was changed
+- Inconsistent behavior with password updates
+
+### Diagnostic Steps
+
+#### Step 1: Check for Race Conditions
+```bash
+# Look for race conditions in password update logic
+grep -r "updateUser" src/components/SettingsModal.tsx
+```
+
+#### Step 2: Check Error Handling
+```bash
+# Look for error handling in password update
+grep -r "catch" src/components/SettingsModal.tsx
+```
+
+#### Step 3: Check State Management
+```bash
+# Look for state updates in password change flow
+grep -r "setPasswordChangeStatus" src/components/SettingsModal.tsx
+```
+
+### Common Fixes
+
+1. **Implement Proper Completion Flag**
+   ```typescript
+   // Add a completion flag to prevent timeout from firing after success
+   let updateCompleted = false;
+   
+   try {
+     // Set a timeout
+     const timeoutId = setTimeout(() => {
+       if (!updateCompleted) {
+         // Only show timeout error if not completed
+         setPasswordChangeStatus('error');
+         setPasswordChangeError('Password update timed out. Please try again.');
+       }
+     }, 30000);
+     
+     // Perform update
+     const { data, error } = await supabase.auth.updateUser({
+       password: newPassword
+     });
+     
+     // Mark as completed
+     updateCompleted = true;
+     
+     // Clear timeout
+     clearTimeout(timeoutId);
+     
+     // Handle result
+     if (error) {
+       setPasswordChangeStatus('error');
+       setPasswordChangeError(error.message);
+     } else {
+       setPasswordChangeStatus('success');
+     }
+   } catch (error) {
+     // Mark as completed to prevent timeout
+     updateCompleted = true;
+     
+     // Handle error
+     setPasswordChangeStatus('error');
+     setPasswordChangeError('An unexpected error occurred');
+   }
+   ```
+
+2. **Use AbortController for Cancellation**
+   ```typescript
+   const abortController = new AbortController();
+   
+   try {
+     // Set timeout to abort after 30 seconds
+     const timeoutId = setTimeout(() => {
+       abortController.abort();
+     }, 30000);
+     
+     // Use abort signal if applicable
+     // For Supabase, we can't directly use the signal, but we can check it
+     
+     if (abortController.signal.aborted) {
+       throw new Error('Operation was aborted');
+     }
+     
+     // Perform update
+     const { data, error } = await supabase.auth.updateUser({
+       password: newPassword
+     });
+     
+     // Clear timeout
+     clearTimeout(timeoutId);
+     
+     // Handle result
+   } catch (error) {
+     // Handle error, checking if it was aborted
+     if (error.name === 'AbortError' || abortController.signal.aborted) {
+       setPasswordChangeStatus('error');
+       setPasswordChangeError('Password update timed out. Please try again.');
+     } else {
+       // Handle other errors
+     }
+   }
+   ```
+
+3. **Improve Error Handling and Feedback**
+   ```typescript
+   try {
+     // Attempt password update
+     const { data, error } = await supabase.auth.updateUser({
+       password: newPassword
+     });
+     
+     if (error) {
+       // Provide specific error messages based on error type
+       let errorMessage = 'Password update failed. ';
+       
+       switch (error.message) {
+         case 'New password should be different from the old password.':
+           errorMessage = 'New password must be different from your current password.';
+           break;
+         case 'Password should be at least 6 characters.':
+           errorMessage = 'Password must be at least 6 characters long.';
+           break;
+         case 'JWT expired':
+           errorMessage = 'Your session has expired. Please sign out and sign back in.';
+           break;
+         default:
+           errorMessage += error.message;
+       }
+       
+       setPasswordChangeStatus('error');
+       setPasswordChangeError(errorMessage);
+     } else {
+       setPasswordChangeStatus('success');
+       // Clear form fields
+       setNewPassword('');
+       setConfirmPassword('');
+     }
+   } catch (error) {
+     // Handle unexpected errors
+     setPasswordChangeStatus('error');
+     setPasswordChangeError('An unexpected error occurred. Please try again.');
+   }
+   ```
+
 ## Complete Reset Procedure
 
 If all else fails, try this complete reset:
@@ -470,6 +1020,7 @@ git push origin main
 - [ ] Netlify configuration correct
 - [ ] No console errors in browser
 - [ ] All imports use correct paths and extensions
+- [ ] Tests pass with `npm run test`
 
 ## Getting Help
 
@@ -480,6 +1031,7 @@ If issues persist:
 3. **Use browser dev tools** - Console and Network tabs show most client-side issues
 4. **Check Netlify deploy logs** - Server-side build issues appear here
 5. **Verify environment variables** - Many deployment issues are due to missing env vars
+6. **Run tests** - Use `npm run test` to verify functionality
 
 ## Emergency Recovery
 

@@ -534,11 +534,13 @@ CREATE TRIGGER on_auth_user_created
 - Writing sample collection and management
 - Subscription-aware sample limits
 - Real-time save status with error handling
+- **Input sanitization**: Validates and sanitizes user input before saving
 
 #### `TextRewriter.tsx`
 - Main rewriting interface with centered, responsive layout
 - Token usage validation and real-time feedback
 - **Enhanced export tracking**: Comprehensive logging and error handling for all subscription tiers
+- **Centralized export service**: Uses ExportService for consistent export handling
 - Progressive disclosure for rewrite summary and history
 - Consistent button styling across all controls
 
@@ -546,6 +548,7 @@ CREATE TRIGGER on_auth_user_created
 - Subscription-based tone adjustment interface
 - **Intelligent tone filtering**: Only shows controls available to user's tier
 - **Graceful degradation**: Handles unavailable controls without errors
+- **Performance optimized**: Uses React.memo, useCallback, and useMemo
 - Progressive feature unlocking (Free → Pro → Premium)
 - Preset management and custom fine-tuning
 
@@ -556,6 +559,7 @@ CREATE TRIGGER on_auth_user_created
 - Enhanced status detection for expired subscriptions
 
 #### `RewriteHistoryModal.tsx`
+- **Paginated history loading**: Loads history in chunks to prevent performance issues
 - **Enhanced export functionality**: Both bulk and individual item exports
 - **Comprehensive export tracking**: All exports update database and local state
 - **Tier-aware export limits**: Shows remaining exports for Free/Pro, unlimited for Premium
@@ -568,11 +572,18 @@ CREATE TRIGGER on_auth_user_created
 - Shows only when explicitly requested via button click
 - Subscription-aware analytics display
 
+#### `PasswordChangeConfirmation.tsx`
+- Improved password change flow with proper state management
+- Fixed "Back to Login" functionality with proper cleanup
+- Prevents race conditions with AbortController
+- Provides clear feedback on password change status
+
 ### Authentication & Security
 
 #### `useAuth.ts`
 - Centralized authentication state management
-- Token usage tracking and validation with billing-based resets
+- **Memory leak prevention**: Uses mountedRef to prevent state updates after unmount
+- **Token validation with consistent limits**: Uses getExpectedTokensForTier for consistent token limits
 - **Enhanced export tracking**: Comprehensive logging, proper tier handling, and database synchronization
 - **Detailed security logging**: All export attempts logged with success/failure status
 - Enhanced error handling and user feedback
@@ -584,6 +595,27 @@ CREATE TRIGGER on_auth_user_created
 - **Audit Logging**: Comprehensive security event tracking
 - **Rate Limiting**: Protection against abuse
 - **Input Validation**: Client and server-side validation
+- **Secure Logging**: Sanitizes sensitive information in logs
+
+### Utility Services
+
+#### `errorHandler.ts`
+- **AppError class**: Standardized error handling with severity levels
+- **handleError function**: Converts unknown errors to AppError instances
+- **secureLog function**: Sanitizes sensitive data in logs
+- **checkRateLimit function**: Prevents abuse through rate limiting
+
+#### `inputSanitizer.ts`
+- **sanitizeInput**: General input sanitization
+- **sanitizeTitle**: Specific sanitization for writing sample titles
+- **sanitizeContent**: Specific sanitization for writing sample content
+- Prevents XSS attacks and other injection vulnerabilities
+
+#### `exportService.ts`
+- **Centralized export handling**: Single service for all export operations
+- **Consistent validation**: Validates export limits before file creation
+- **Proper error handling**: Standardized error handling for all export operations
+- **Comprehensive logging**: Detailed logging of all export attempts
 
 ## Subscription System
 
@@ -614,49 +646,67 @@ The export system has been completely redesigned for accuracy and reliability ac
    - Export all history (bulk export)
    - Export individual rewrite items
 
-#### Export Tracking Implementation
+#### Centralized Export Service
 ```typescript
-const updateExports = async (exportsUsed: number) => {
-  // Comprehensive logging for debugging
-  console.log('Updating exports:', { 
-    exportsUsed, 
-    currentExports: user.monthly_exports_used,
-    subscriptionTier: user.subscription_tier 
-  });
-
-  // Premium users have unlimited exports
-  if (user.subscription_tier === 'premium') {
-    // Log for analytics but don't enforce limits
-    await logSecurityEvent({
-      userId: user.id,
-      action: 'export_unlimited',
-      resource: 'exports',
-      allowed: true,
-      subscriptionTier: user.subscription_tier,
-    });
-    return { error: null };
-  }
-
-  // Check and enforce limits for Free/Pro tiers
-  const limits = getExportLimits();
-  const newExportsUsed = (user.monthly_exports_used || 0) + exportsUsed;
+export class ExportService {
+  private updateExports: (count: number) => Promise<{ error: Error | null }>;
   
-  if (newExportsUsed > limits.monthlyLimit) {
-    return { error: new Error(`Monthly export limit reached (${limits.monthlyLimit} exports)`) };
+  constructor(updateExportsFunction: (count: number) => Promise<{ error: Error | null }>) {
+    this.updateExports = updateExportsFunction;
   }
-
-  // Update database and local state
-  const { error } = await supabase
-    .from('users')
-    .update({ monthly_exports_used: newExportsUsed })
-    .eq('id', user.id);
-
-  if (!error) {
-    setUser({ ...user, monthly_exports_used: newExportsUsed });
+  
+  async exportData(data: any, filename: string, user: User): Promise<void> {
+    secureLog('Export attempt:', {
+      userTier: user.subscription_tier,
+      currentExports: user.monthly_exports_used,
+      filename: filename.replace(/[^a-zA-Z0-9.-]/g, '[SANITIZED]')
+    });
+    
+    // Validate export limits
+    await this.validateExportLimits(user);
+    
+    // Create and download file
+    await this.createAndDownloadFile(data, filename);
+    
+    // Update export count
+    const { error } = await this.updateExports(1);
+    if (error) {
+      secureLog('Export count update failed:', { error: error.message });
+      throw error;
+    }
+    
+    secureLog('Export completed successfully');
   }
-
-  return { error };
-};
+  
+  private async validateExportLimits(user: User): Promise<void> {
+    const limits = getSubscriptionLimits(user);
+    
+    if (limits.exportLimit === -1) {
+      // Unlimited exports for Premium
+      return;
+    }
+    
+    const currentExports = user.monthly_exports_used || 0;
+    if (currentExports >= limits.exportLimit) {
+      throw new Error(`Monthly export limit reached (${limits.exportLimit} exports)`);
+    }
+  }
+  
+  private async createAndDownloadFile(data: any, filename: string): Promise<void> {
+    try {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      secureLog('File creation failed:', { error });
+      throw new Error('Failed to create export file');
+    }
+  }
+}
 ```
 
 #### Export Process Flow
@@ -672,8 +722,19 @@ const updateExports = async (exportsUsed: number) => {
 ```typescript
 // Token usage validation with billing-based resets
 const updateTokens = async (tokensUsed: number) => {
-  // Check subscription limits
-  const limits = getSubscriptionLimits(user);
+  // Get subscription limits with corrected values
+  const getSubscriptionLimits = () => {
+    switch (user.subscription_tier) {
+      case 'pro':
+        return { dailyLimit: -1, monthlyLimit: 5000000 }; // No daily limit for Pro
+      case 'premium':
+        return { dailyLimit: -1, monthlyLimit: 10000000 }; // No daily limit for Premium
+      default:
+        return { dailyLimit: 100000, monthlyLimit: 1000000 }; // Free tier: 100K daily, 1M monthly
+    }
+  };
+
+  const limits = getSubscriptionLimits();
   
   // For Pro/Premium: Check if monthly reset is due based on billing cycle
   if (user.subscription_tier !== 'free') {
@@ -865,6 +926,71 @@ export const logSecurityEvent = async (event: SecurityEvent): Promise<void> => {
 };
 ```
 
+### Secure Logging
+```typescript
+export const secureLog = (message: string, data?: any) => {
+  if (import.meta.env.DEV) {
+    // Sanitize sensitive data in development
+    const sanitizedData = data ? sanitizeLogData(data) : undefined;
+    console.log(message, sanitizedData);
+  }
+};
+
+const sanitizeLogData = (data: any): any => {
+  if (!data || typeof data !== 'object') return data;
+  
+  const sensitive = ['password', 'email', 'token', 'key', 'secret'];
+  
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeLogData(item));
+  }
+  
+  return Object.keys(data).reduce((acc, key) => {
+    if (sensitive.some(s => key.toLowerCase().includes(s))) {
+      acc[key] = '[REDACTED]';
+    } else if (typeof data[key] === 'object') {
+      acc[key] = sanitizeLogData(data[key]);
+    } else {
+      acc[key] = data[key];
+    }
+    return acc;
+  }, {} as any);
+};
+```
+
+### Input Sanitization
+```typescript
+export const sanitizeInput = (input: string): string => {
+  if (!input || typeof input !== 'string') return '';
+  
+  return input
+    .trim()
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+\s*=/gi, '') // Remove event handlers
+    .substring(0, 10000); // Limit length
+};
+
+export const sanitizeTitle = (title: string): string => {
+  if (!title || typeof title !== 'string') return '';
+  
+  return title
+    .trim()
+    .replace(/[<>]/g, '') // Remove angle brackets
+    .substring(0, 200); // Limit title length
+};
+
+export const sanitizeContent = (content: string): string => {
+  if (!content || typeof content !== 'string') return '';
+  
+  return content
+    .trim()
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
+    .substring(0, 50000); // Limit content length
+};
+```
+
 ## UI/UX Design Principles
 
 ### Responsive Layout
@@ -913,6 +1039,9 @@ npm run dev
 
 # Build for production
 npm run build
+
+# Run tests
+npm run test
 ```
 
 ### Database Setup
@@ -944,13 +1073,14 @@ npm run build
 
 ### Frontend Optimizations
 - **Code Splitting**: Lazy loading of components
-- **Memoization**: React.memo for expensive components
+- **Memoization**: React.memo for expensive components like ToneControls
 - **Bundle Optimization**: Vite's built-in optimizations
 
 ### Database Optimizations
 - **Indexes**: Strategic indexing on frequently queried columns
 - **RLS Optimization**: Efficient policy design
 - **Connection Pooling**: Supabase's built-in pooling
+- **Pagination**: Implemented in RewriteHistoryModal to prevent loading all history at once
 
 ### Caching Strategy
 - **Browser Caching**: Static assets with proper headers
@@ -967,6 +1097,7 @@ npm run build
 - [ ] Error monitoring setup
 - [ ] Performance monitoring enabled
 - [ ] Export tracking functionality tested across all sources
+- [ ] Password change flow tested with timeout handling
 
 ### Monitoring & Analytics
 - **Error Tracking**: Comprehensive error logging
@@ -1035,6 +1166,14 @@ Handles subscription tier changes with proper billing date tracking.
   - Verify `availableToneControls` array for user's tier
   - Ensure tone validation allows reasonable tolerance for defaults
 
+#### Password Change Issues
+- **Symptoms**: "Password update timed out" errors, but password was actually changed
+- **Solutions**:
+  - Check AbortController implementation in SettingsModal
+  - Verify timeout handling and cleanup
+  - Ensure proper state management during password change flow
+  - Test with network throttling to simulate slow connections
+
 #### Rewrite History Not Saving
 - Check RLS policies on rewrite_history table
 - Verify user authentication state
@@ -1054,7 +1193,7 @@ Handles subscription tier changes with proper billing date tracking.
 ### Export Tracking Debugging
 ```typescript
 // Enable detailed export logging in browser console
-console.log('Export attempt:', {
+secureLog('Export attempt:', {
   userTier: user.subscription_tier,
   currentExports: user.monthly_exports_used,
   hasResult: !!result,
@@ -1078,6 +1217,7 @@ console.log('Export limits:', limits);
 - **ESLint**: Configured for React and TypeScript
 - **Prettier**: Consistent code formatting
 - **Conventional Commits**: Structured commit messages
+- **Unit Tests**: Required for critical functionality
 
 ### Pull Request Process
 1. Create feature branch from main
