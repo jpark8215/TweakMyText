@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { User, LogOut, Settings, Zap, Crown } from 'lucide-react';
+import { User, LogOut, Settings, Zap, Crown, Shield } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 interface UserMenuProps {
   onOpenSettings?: () => void;
   onManageSubscription?: () => void;
   onOpenPricing?: () => void;
+  onOpenAdmin?: () => void; // NEW: Admin panel trigger
 }
 
-export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenPricing }: UserMenuProps) {
+export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenPricing, onOpenAdmin }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { user, signOut } = useAuth();
@@ -59,6 +60,11 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
   const handleUpgradeClick = () => {
     setIsOpen(false);
     onOpenPricing?.();
+  };
+
+  const handleAdminClick = () => {
+    setIsOpen(false);
+    onOpenAdmin?.();
   };
 
   const getTierColor = (tier: string) => {
@@ -152,6 +158,15 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
                   Upgrade Plan
                 </button>
               )}
+
+              {/* Admin Panel Button - Testing Mode */}
+              <button
+                onClick={handleAdminClick}
+                className="w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors text-left"
+              >
+                <Shield className="w-4 h-4" />
+                Admin Panel (Testing)
+              </button>
               
               <hr className="my-2 border-gray-200" />
               

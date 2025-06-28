@@ -7,6 +7,7 @@ import SettingsModal from './components/SettingsModal';
 import PricingModal from './components/PricingModal';
 import SubscriptionManagement from './components/SubscriptionManagement';
 import UserMenu from './components/UserMenu';
+import AdminPanel from './components/AdminPanel';
 import { WritingSample } from './types';
 import { useAuth } from './hooks/useAuth';
 
@@ -18,6 +19,7 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   const { user, loading } = useAuth();
 
@@ -29,6 +31,7 @@ function App() {
       setWritingSamples([]);
       setShowSettingsModal(false);
       setShowPricingModal(false);
+      setShowAdminPanel(false);
     }
   }, [user, loading]);
 
@@ -59,6 +62,10 @@ function App() {
 
   const handleOpenPricing = () => {
     setShowPricingModal(true);
+  };
+
+  const handleOpenAdmin = () => {
+    setShowAdminPanel(true);
   };
 
   if (loading) {
@@ -231,6 +238,7 @@ function App() {
                   onOpenSettings={() => setShowSettingsModal(true)}
                   onManageSubscription={handleManageSubscription}
                   onOpenPricing={handleOpenPricing}
+                  onOpenAdmin={handleOpenAdmin}
                 />
               ) : (
                 <button
@@ -306,6 +314,11 @@ function App() {
       <PricingModal
         isOpen={showPricingModal}
         onClose={() => setShowPricingModal(false)}
+      />
+
+      <AdminPanel
+        isOpen={showAdminPanel}
+        onClose={() => setShowAdminPanel(false)}
       />
     </div>
   );
