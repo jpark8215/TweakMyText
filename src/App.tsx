@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PenTool, Sparkles, LogIn, Zap } from 'lucide-react';
 import StyleCapture from './components/StyleCapture';
 import TextRewriter from './components/TextRewriter';
+import EnhancedTextRewriter from './components/EnhancedTextRewriter';
 import AuthModal from './components/AuthModal';
 import SettingsModal from './components/SettingsModal';
 import PricingModal from './components/PricingModal';
@@ -10,7 +11,7 @@ import UserMenu from './components/UserMenu';
 import { WritingSample } from './types';
 import { useAuth } from './hooks/useAuth';
 
-type AppView = 'capture' | 'rewrite' | 'subscription';
+type AppView = 'capture' | 'rewrite' | 'enhanced-rewrite' | 'subscription';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('capture');
@@ -24,7 +25,6 @@ function App() {
   // Reset view and clear data when user signs out
   useEffect(() => {
     if (!user && !loading) {
-      // User has signed out, reset to capture view and clear samples
       setCurrentView('capture');
       setWritingSamples([]);
       setShowSettingsModal(false);
@@ -41,7 +41,7 @@ function App() {
       setShowAuthModal(true);
       return;
     }
-    setCurrentView('rewrite');
+    setCurrentView('enhanced-rewrite'); // Use enhanced rewriter by default
   };
 
   const handleBack = () => {
@@ -75,7 +75,7 @@ function App() {
   }
 
   // Show signed out state for rewrite and subscription views when not authenticated
-  if (!user && (currentView === 'rewrite' || currentView === 'subscription')) {
+  if (!user && (currentView === 'rewrite' || currentView === 'enhanced-rewrite' || currentView === 'subscription')) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         {/* Header */}
@@ -216,7 +216,7 @@ function App() {
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
-                      currentView === 'rewrite' 
+                      currentView === 'enhanced-rewrite' || currentView === 'rewrite'
                         ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-lg shadow-blue-400/50' 
                         : 'bg-gray-300'
                     }`} />
@@ -253,6 +253,12 @@ function App() {
             samples={writingSamples}
             onSamplesChange={handleSamplesChange}
             onNext={handleNext}
+          />
+        ) : currentView === 'enhanced-rewrite' ? (
+          <EnhancedTextRewriter
+            samples={writingSamples}
+            onBack={handleBack}
+            onOpenPricing={handleOpenPricing}
           />
         ) : currentView === 'rewrite' ? (
           <TextRewriter
