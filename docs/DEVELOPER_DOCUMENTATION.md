@@ -39,13 +39,20 @@ TweakMyText is a sophisticated AI-powered writing style rewriter that learns fro
 - Comprehensive security logging and audit trails
 - **Billing-based resets**: Pro/Premium users get monthly resets based on billing start date, not user creation date
 
-### 4. **Rewrite History & Analytics**
+### 4. **Export Tracking System**
+- **Free Tier**: 5 exports per month with strict tracking
+- **Pro Tier**: 200 exports per month with usage monitoring
+- **Premium Tier**: Unlimited exports with logging for analytics
+- Real-time export count updates and user feedback
+- Comprehensive error handling and database synchronization
+
+### 5. **Rewrite History & Analytics**
 - Pro/Premium users get access to rewrite history
 - Premium users get advanced analytics and insights
 - Export functionality with tier-specific data access
 - **Progressive disclosure**: Rewrite summary shown only when requested
 
-### 5. **Subscription Management**
+### 6. **Subscription Management**
 - Clear subscription status indicators with proper cancellation tracking
 - Cancellation with grace period management based on billing cycles
 - Billing history and usage analytics
@@ -68,7 +75,7 @@ CREATE TABLE users (
   last_token_reset date DEFAULT CURRENT_DATE,
   monthly_reset_date integer DEFAULT EXTRACT(day FROM CURRENT_DATE),
   subscription_expires_at timestamptz,
-  billing_start_date timestamptz, -- NEW: When paid subscription billing started
+  billing_start_date timestamptz, -- When paid subscription billing started
   created_at timestamptz DEFAULT now()
 );
 ```
@@ -158,6 +165,7 @@ CREATE POLICY "Users can read own writing samples"
 #### `TextRewriter.tsx`
 - Main rewriting interface with centered, responsive layout
 - Token usage validation and real-time feedback
+- **Enhanced export tracking**: Comprehensive logging and error handling for all subscription tiers
 - Progressive disclosure for rewrite summary and history
 - Consistent button styling across all controls
 
@@ -182,6 +190,7 @@ CREATE POLICY "Users can read own writing samples"
 #### `useAuth.ts`
 - Centralized authentication state management
 - Token usage tracking and validation with billing-based resets
+- **Enhanced export tracking**: Comprehensive logging, proper tier handling, and database synchronization
 - Enhanced error handling and user feedback
 - Rewrite history saving with comprehensive logging
 
@@ -205,6 +214,68 @@ CREATE POLICY "Users can read own writing samples"
 | Rewrite History | No | Yes | Yes + Analytics |
 | Processing Speed | 1x | 2x | 3x |
 | Monthly Exports | 5 | 200 | Unlimited |
+
+### Export Tracking System
+
+The export system has been completely redesigned for accuracy and reliability:
+
+#### Export Limits by Tier
+- **Free Tier**: 5 exports per month with strict enforcement
+- **Pro Tier**: 200 exports per month with usage monitoring
+- **Premium Tier**: Unlimited exports (tracked for analytics only)
+
+#### Export Tracking Implementation
+```typescript
+const updateExports = async (exportsUsed: number) => {
+  // Comprehensive logging for debugging
+  console.log('Updating exports:', { 
+    exportsUsed, 
+    currentExports: user.monthly_exports_used,
+    subscriptionTier: user.subscription_tier 
+  });
+
+  // Premium users have unlimited exports
+  if (user.subscription_tier === 'premium') {
+    // Log for analytics but don't enforce limits
+    await logSecurityEvent({
+      userId: user.id,
+      action: 'export_unlimited',
+      resource: 'exports',
+      allowed: true,
+      subscriptionTier: user.subscription_tier,
+    });
+    return { error: null };
+  }
+
+  // Check and enforce limits for Free/Pro tiers
+  const limits = getExportLimits();
+  const newExportsUsed = (user.monthly_exports_used || 0) + exportsUsed;
+  
+  if (newExportsUsed > limits.monthlyLimit) {
+    return { error: new Error(`Monthly export limit reached (${limits.monthlyLimit} exports)`) };
+  }
+
+  // Update database and local state
+  const { error } = await supabase
+    .from('users')
+    .update({ monthly_exports_used: newExportsUsed })
+    .eq('id', user.id);
+
+  if (!error) {
+    setUser({ ...user, monthly_exports_used: newExportsUsed });
+  }
+
+  return { error };
+};
+```
+
+#### Export Process Flow
+1. **User clicks export button**
+2. **Pre-export validation**: Check tier limits and current usage
+3. **File generation**: Create export file with subscription-appropriate data
+4. **Database update**: Increment export count for Free/Pro users
+5. **State synchronization**: Update local user state
+6. **Comprehensive logging**: Track all export attempts and outcomes
 
 ### Token Management
 
@@ -407,11 +478,13 @@ npm run build
 - Component rendering and interaction
 - Utility function validation
 - Subscription logic verification
+- **Export tracking validation**: Test export limits and database updates
 
 ### Integration Testing
 - Authentication flow
 - Database operations
 - API integrations
+- **Export workflow testing**: End-to-end export process validation
 
 ### Security Testing
 - RLS policy validation
@@ -444,10 +517,12 @@ npm run build
 - [ ] Claude API key configured (if using)
 - [ ] Error monitoring setup
 - [ ] Performance monitoring enabled
+- [ ] Export tracking functionality tested
 
 ### Monitoring & Analytics
 - **Error Tracking**: Comprehensive error logging
 - **Usage Analytics**: Token usage patterns and trends
+- **Export Analytics**: Export usage patterns by subscription tier
 - **Performance Metrics**: Response times and user engagement
 - **Security Monitoring**: Failed authentication attempts and suspicious activity
 
@@ -495,6 +570,14 @@ Handles subscription tier changes with proper billing date tracking.
 - Check subscription tier calculations
 - Validate usage tracking accuracy
 
+#### Export Tracking Issues
+- **Symptoms**: Export counts not updating, incorrect limits shown
+- **Solutions**: 
+  - Check database `monthly_exports_used` field updates
+  - Verify `updateExports` function is being called for all tiers
+  - Review console logs for export tracking errors
+  - Ensure RLS policies allow export count updates
+
 #### Rewrite History Not Saving
 - Check RLS policies on rewrite_history table
 - Verify user authentication state
@@ -509,6 +592,26 @@ Handles subscription tier changes with proper billing date tracking.
 - Browser developer tools for client-side debugging
 - Supabase dashboard for database inspection
 - Security audit log for access control debugging
+- **Export tracking logs**: Console logs in browser for export process debugging
+
+### Export Tracking Debugging
+```typescript
+// Enable detailed export logging in browser console
+console.log('Export attempt:', {
+  userTier: user.subscription_tier,
+  currentExports: user.monthly_exports_used,
+  hasResult: !!result
+});
+
+// Check database state
+SELECT id, email, subscription_tier, monthly_exports_used 
+FROM users 
+WHERE id = 'user-id';
+
+// Verify export limits
+const limits = getSubscriptionLimits(user);
+console.log('Export limits:', limits);
+```
 
 ## Contributing
 
@@ -534,6 +637,7 @@ Handles subscription tier changes with proper billing date tracking.
 - **Team Collaboration**: Share writing samples within organizations
 - **Advanced Analytics**: Detailed writing improvement insights
 - **API Access**: RESTful API for third-party integrations
+- **Enhanced Export Formats**: PDF, DOCX, and other formats for Premium users
 
 ### Technical Improvements
 - **Real-time Collaboration**: WebSocket-based live editing
@@ -548,6 +652,7 @@ Handles subscription tier changes with proper billing date tracking.
 - **Performance Monitoring**: Track and optimize slow queries
 - **Security Updates**: Regular dependency updates and security patches
 - **Backup Verification**: Ensure data backup integrity
+- **Export Analytics Review**: Monitor export usage patterns and optimize limits
 
 ### Support Channels
 - **Documentation**: Comprehensive user and developer guides
