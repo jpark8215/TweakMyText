@@ -545,7 +545,7 @@ export const useAuth = () => {
       subscriptionTier: user.subscription_tier 
     });
 
-    // Log export attempt
+    // Log export attempt with detailed information
     await logSecurityEvent({
       userId: user.id,
       action: 'export_attempt',
@@ -570,7 +570,7 @@ export const useAuth = () => {
 
     // Check if unlimited exports (Premium)
     if (limits.monthlyLimit === -1) {
-      console.log('Premium user - unlimited exports');
+      console.log('Premium user - unlimited exports, logging for analytics');
       await logSecurityEvent({
         userId: user.id,
         action: 'export_unlimited',
@@ -618,7 +618,7 @@ export const useAuth = () => {
         // Update local user state
         setUser({ ...user, monthly_exports_used: newExportsUsed });
         
-        // Log successful export
+        // Log successful export with detailed information
         await logSecurityEvent({
           userId: user.id,
           action: 'export_successful',
@@ -644,6 +644,14 @@ export const useAuth = () => {
       return { error };
     } catch (error: any) {
       console.error('Export update exception:', error);
+      await logSecurityEvent({
+        userId: user.id,
+        action: 'export_exception',
+        resource: 'exports',
+        allowed: false,
+        subscriptionTier: user.subscription_tier,
+        errorMessage: `Exception during export update: ${error.message}`,
+      });
       return { error };
     }
   };

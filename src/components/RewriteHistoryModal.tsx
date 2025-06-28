@@ -25,8 +25,9 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
   const [selectedItem, setSelectedItem] = useState<RewriteHistoryItem | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'confidence'>('date');
   const [filterTag, setFilterTag] = useState<string>('');
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
-  const { user } = useAuth();
+  const { user, updateExports } = useAuth();
 
   useEffect(() => {
     if (isOpen && user) {
@@ -62,38 +63,147 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
   const handleExportHistory = async () => {
     if (!user || history.length === 0) return;
 
-    const exportData = {
-      user: user.email,
-      subscription_tier: user.subscription_tier,
-      export_date: new Date().toISOString(),
-      total_rewrites: history.length,
-      analytics: user.subscription_tier === 'premium' ? {
-        avg_confidence: history.reduce((sum, item) => sum + item.confidence, 0) / history.length,
-        most_common_tags: getMostCommonTags(),
-        monthly_breakdown: getMonthlyBreakdown(),
-        style_evolution: getStyleEvolution()
-      } : null,
-      history: history.map(item => ({
-        id: item.id,
-        date: item.created_at,
-        confidence: item.confidence,
-        style_tags: item.style_tags,
-        original_preview: item.original_text.substring(0, 100) + '...',
-        rewritten_preview: item.rewritten_text.substring(0, 100) + '...',
-        ...(user.subscription_tier === 'premium' && {
-          full_original: item.original_text,
-          full_rewritten: item.rewritten_text
-        })
-      }))
-    };
+    console.log('Exporting full history:', {
+      userTier: user.subscription_tier,
+      currentExports: user.monthly_exports_used,
+      historyCount: history.length
+    });
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rewrite-history-${user.subscription_tier}-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      // Check export limits before proceeding
+      if (user.subscription_tier === 'free') {
+        const monthlyExportsUsed = user.monthly_exports_used || 0;
+        if (monthlyExportsUsed >= 5) {
+          alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for more exports.');
+          return;
+        }
+      } else if (user.subscription_tier === 'pro') {
+        const monthlyExportsUsed = user.monthly_exports_used || 0;
+        if (monthlyExportsUsed >= 200) {
+          alert('You have reached your monthly export limit of 200. Upgrade to Premium for unlimited exports.');
+          return;
+        }
+      }
+      // Premium users have unlimited exports
+
+      const exportData = {
+        user: user.email,
+        subscription_tier: user.subscription_tier,
+        export_date: new Date().toISOString(),
+        total_rewrites: history.length,
+        analytics: user.subscription_tier === 'premium' ? {
+          avg_confidence: history.reduce((sum, item) => sum + item.confidence, 0) / history.length,
+          most_common_tags: getMostCommonTags(),
+          monthly_breakdown: getMonthlyBreakdown(),
+          style_evolution: getStyleEvolution()
+        } : null,
+        history: history.map(item => ({
+          id: item.id,
+          date: item.created_at,
+          confidence: item.confidence,
+          style_tags: item.style_tags,
+          original_preview: item.original_text.substring(0, 100) + '...',
+          rewritten_preview: item.rewritten_text.substring(0, 100) + '...',
+          ...(user.subscription_tier === 'premium' && {
+            full_original: item.original_text,
+            full_rewritten: item.rewritten_text
+          })
+        }))
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rewrite-history-${user.subscription_tier}-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      console.log('History export file created, updating export count...');
+
+      // Update export count for all tiers (Premium will be handled in updateExports)
+      const { error } = await updateExports(1);
+      if (error) {
+        console.error('Failed to update export count:', error);
+        // Don't show error to user since export was successful
+      } else {
+        console.log('Export count updated successfully for history export');
+      }
+    } catch (error) {
+      console.error('History export failed:', error);
+      alert('Export failed. Please try again.');
+    }
+  };
+
+  const handleExportSingleItem = async (item: RewriteHistoryItem) => {
+    if (!user) return;
+
+    console.log('Exporting single history item:', {
+      userTier: user.subscription_tier,
+      currentExports: user.monthly_exports_used,
+      itemId: item.id
+    });
+
+    setExportingId(item.id);
+
+    try {
+      // Check export limits before proceeding
+      if (user.subscription_tier === 'free') {
+        const monthlyExportsUsed = user.monthly_exports_used || 0;
+        if (monthlyExportsUsed >= 5) {
+          alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for more exports.');
+          return;
+        }
+      } else if (user.subscription_tier === 'pro') {
+        const monthlyExportsUsed = user.monthly_exports_used || 0;
+        if (monthlyExportsUsed >= 200) {
+          alert('You have reached your monthly export limit of 200. Upgrade to Premium for unlimited exports.');
+          return;
+        }
+      }
+      // Premium users have unlimited exports
+
+      const exportData = {
+        user: user.email,
+        subscription_tier: user.subscription_tier,
+        export_date: new Date().toISOString(),
+        export_type: 'single_rewrite',
+        rewrite: {
+          id: item.id,
+          date: item.created_at,
+          confidence: item.confidence,
+          style_tags: item.style_tags,
+          original_text: user.subscription_tier === 'premium' ? item.original_text : item.original_text.substring(0, 500) + '...',
+          rewritten_text: user.subscription_tier === 'premium' ? item.rewritten_text : item.rewritten_text.substring(0, 500) + '...',
+          word_count_original: item.original_text.split(' ').length,
+          word_count_rewritten: item.rewritten_text.split(' ').length
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rewrite-${item.id.substring(0, 8)}-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      console.log('Single item export file created, updating export count...');
+
+      // Update export count for all tiers
+      const { error } = await updateExports(1);
+      if (error) {
+        console.error('Failed to update export count:', error);
+        // Don't show error to user since export was successful
+      } else {
+        console.log('Export count updated successfully for single item export');
+      }
+    } catch (error) {
+      console.error('Single item export failed:', error);
+      alert('Export failed. Please try again.');
+    } finally {
+      setExportingId(null);
+    }
   };
 
   const getMostCommonTags = () => {
@@ -287,7 +397,22 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
                 className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg font-medium hover:from-emerald-600 hover:to-teal-600 transition-all flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                Export
+                Export All
+                {user && user.subscription_tier === 'free' && (
+                  <span className="text-xs opacity-75">
+                    ({5 - (user.monthly_exports_used || 0)} left)
+                  </span>
+                )}
+                {user && user.subscription_tier === 'pro' && (
+                  <span className="text-xs opacity-75">
+                    ({200 - (user.monthly_exports_used || 0)} left)
+                  </span>
+                )}
+                {user && user.subscription_tier === 'premium' && (
+                  <span className="text-xs opacity-75">
+                    (Unlimited)
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -359,6 +484,21 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
                           item.confidence >= 60 ? 'bg-amber-500' : 'bg-red-500'
                         }`} />
                         <span className="text-sm font-medium text-gray-700">{Math.round(item.confidence)}%</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportSingleItem(item);
+                          }}
+                          disabled={exportingId === item.id}
+                          className="ml-2 p-1 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50"
+                          title="Export this rewrite"
+                        >
+                          {exportingId === item.id ? (
+                            <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Download className="w-3 h-3" />
+                          )}
+                        </button>
                       </div>
                     </div>
                     
@@ -456,6 +596,26 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
                       </div>
                     </div>
                   )}
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => handleExportSingleItem(selectedItem)}
+                      disabled={exportingId === selectedItem.id}
+                      className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:from-emerald-600 hover:to-teal-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {exportingId === selectedItem.id ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Exporting...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          Export This Rewrite
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
