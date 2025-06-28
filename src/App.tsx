@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PenTool, Sparkles, LogIn } from 'lucide-react';
+import { PenTool, Sparkles, LogIn, Zap } from 'lucide-react';
 import StyleCapture from './components/StyleCapture';
 import TextRewriter from './components/TextRewriter';
 import AuthModal from './components/AuthModal';
@@ -155,9 +155,22 @@ function App() {
         {/* Footer */}
         <footer className="bg-white/60 backdrop-blur-xl border-t border-gray-200/50 mt-8 sm:mt-12 lg:mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            <div className="flex items-center justify-center gap-3 text-gray-600">
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
-              <span className="text-xs sm:text-sm text-center">Transform any text to match your unique writing style</span>
+            <div className="flex flex-col items-center justify-center gap-4">
+              <div className="flex items-center gap-3 text-gray-600">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+                <span className="text-xs sm:text-sm text-center">Transform any text to match your unique writing style</span>
+              </div>
+              
+              {/* Built with Bolt.new Badge */}
+              <a
+                href="https://bolt.new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-medium rounded-full hover:from-orange-600 hover:to-red-600 transition-all transform hover:scale-105 shadow-lg shadow-orange-500/25"
+              >
+                <Zap className="w-3 h-3" />
+                Built with Bolt.new
+              </a>
             </div>
           </div>
         </footer>
@@ -258,9 +271,22 @@ function App() {
       {/* Footer */}
       <footer className="bg-white/60 backdrop-blur-xl border-t border-gray-200/50 mt-8 sm:mt-12 lg:mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <div className="flex items-center justify-center gap-3 text-gray-600">
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
-            <span className="text-xs sm:text-sm text-center">Transform any text to match your unique writing style</span>
+          <div className="flex flex-col items-center justify-center gap-4">
+            <div className="flex items-center gap-3 text-gray-600">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+              <span className="text-xs sm:text-sm text-center">Transform any text to match your unique writing style</span>
+            </div>
+            
+            {/* Built with Bolt.new Badge */}
+            <a
+              href="https://bolt.new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-medium rounded-full hover:from-orange-600 hover:to-red-600 transition-all transform hover:scale-105 shadow-lg shadow-orange-500/25"
+            >
+              <Zap className="w-3 h-3" />
+              Built with Bolt.new
+            </a>
           </div>
         </div>
       </footer>
