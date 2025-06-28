@@ -39,24 +39,31 @@ TweakMyText is a sophisticated AI-powered writing style rewriter that learns fro
 - Comprehensive security logging and audit trails
 - **Billing-based resets**: Pro/Premium users get monthly resets based on billing start date, not user creation date
 
-### 4. **Export Tracking System**
-- **Free Tier**: 5 exports per month with strict tracking
+### 4. **Comprehensive Export Tracking System**
+- **Free Tier**: 5 exports per month with strict enforcement
 - **Pro Tier**: 200 exports per month with usage monitoring
-- **Premium Tier**: Unlimited exports with logging for analytics
+- **Premium Tier**: Unlimited exports with analytics logging
+- **Multi-source tracking**: Exports from both TextRewriter and RewriteHistoryModal are tracked
 - Real-time export count updates and user feedback
 - Comprehensive error handling and database synchronization
 
-### 5. **Rewrite History & Analytics**
+### 5. **Enhanced Rewrite History & Analytics**
 - Pro/Premium users get access to rewrite history
 - Premium users get advanced analytics and insights
-- Export functionality with tier-specific data access
+- **Individual and bulk export functionality** with tier-specific data access
 - **Progressive disclosure**: Rewrite summary shown only when requested
+- **Single item exports**: Export individual rewrites from history with proper tracking
 
 ### 6. **Subscription Management**
 - Clear subscription status indicators with proper cancellation tracking
 - Cancellation with grace period management based on billing cycles
 - Billing history and usage analytics
 - Reactivation capabilities with new billing cycle initialization
+
+### 7. **Advanced Tone Control System**
+- **Intelligent tone filtering**: Only applies tone controls available to user's subscription tier
+- **Graceful degradation**: Unavailable controls default to neutral (50) without errors
+- **Subscription-aware validation**: Prevents errors when Pro users have Premium-only controls in their settings
 
 ## Database Schema
 
@@ -80,6 +87,27 @@ CREATE TABLE users (
 );
 ```
 
+**Indexes:**
+- `users_pkey` - Primary key on id
+- `users_email_key` - Unique index on email
+
+**Constraints:**
+- `users_tokens_remaining_check` - tokens_remaining >= 0
+- `users_daily_tokens_used_check` - daily_tokens_used >= 0
+- `users_monthly_tokens_used_check` - monthly_tokens_used >= 0
+- `users_monthly_exports_used_check` - monthly_exports_used >= 0
+- `users_subscription_tier_check` - subscription_tier IN ('free', 'pro', 'premium')
+- `users_email_key` - UNIQUE (email)
+- `users_pkey` - PRIMARY KEY (id)
+
+**RLS Policies:**
+- `Users can read own profile` - SELECT for authenticated users where auth.uid() = id
+- `Users can update own profile` - UPDATE for authenticated users where auth.uid() = id
+- `Users can insert own profile` - INSERT for authenticated users where auth.uid() = id
+
+**Foreign Keys:**
+- `users_id_fkey` - FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+
 #### `writing_samples`
 ```sql
 CREATE TABLE writing_samples (
@@ -90,6 +118,22 @@ CREATE TABLE writing_samples (
   created_at timestamptz DEFAULT now()
 );
 ```
+
+**Indexes:**
+- `writing_samples_pkey` - Primary key on id
+- `idx_writing_samples_user_id` - Index on user_id for faster queries
+
+**Constraints:**
+- `writing_samples_pkey` - PRIMARY KEY (id)
+
+**RLS Policies:**
+- `Users can read own writing samples` - SELECT for authenticated users where auth.uid() = user_id
+- `Users can insert own writing samples` - INSERT for authenticated users where auth.uid() = user_id
+- `Users can update own writing samples` - UPDATE for authenticated users where auth.uid() = user_id
+- `Users can delete own writing samples` - DELETE for authenticated users where auth.uid() = user_id
+
+**Foreign Keys:**
+- `writing_samples_user_id_fkey` - FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 
 #### `rewrite_history`
 ```sql
@@ -103,6 +147,23 @@ CREATE TABLE rewrite_history (
   created_at timestamptz DEFAULT now()
 );
 ```
+
+**Indexes:**
+- `rewrite_history_pkey` - Primary key on id
+- `idx_rewrite_history_user_id` - Index on user_id
+- `idx_rewrite_history_created_at` - Index on created_at DESC for chronological ordering
+- `idx_rewrite_history_user_created` - Composite index on (user_id, created_at DESC)
+
+**Constraints:**
+- `rewrite_history_confidence_check` - CHECK (confidence >= 0 AND confidence <= 100)
+- `rewrite_history_pkey` - PRIMARY KEY (id)
+
+**RLS Policies:**
+- `Users can read own rewrite history` - SELECT for authenticated users where auth.uid() = user_id
+- `Users can insert own rewrite history` - INSERT for authenticated users where auth.uid() = user_id
+
+**Foreign Keys:**
+- `rewrite_history_user_id_fkey` - FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 
 #### `billing_history`
 ```sql
@@ -118,6 +179,25 @@ CREATE TABLE billing_history (
   created_at timestamptz DEFAULT now()
 );
 ```
+
+**Indexes:**
+- `billing_history_pkey` - Primary key on id
+- `idx_billing_history_user_id` - Index on user_id
+- `idx_billing_history_created_at` - Index on created_at DESC
+- `idx_billing_history_status` - Index on status
+
+**Constraints:**
+- `billing_history_amount_check` - CHECK (amount >= 0)
+- `billing_history_pkey` - PRIMARY KEY (id)
+- `billing_history_status_check` - CHECK (status IN ('paid', 'pending', 'failed', 'refunded'))
+- `billing_history_subscription_tier_check` - CHECK (subscription_tier IN ('free', 'pro', 'premium'))
+
+**RLS Policies:**
+- `Users can read own billing history` - SELECT for authenticated users where auth.uid() = user_id
+- `System can insert billing records` - INSERT with CHECK (true) for system operations
+
+**Foreign Keys:**
+- `billing_history_user_id_fkey` - FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 
 #### `security_audit_log`
 ```sql
@@ -135,17 +215,310 @@ CREATE TABLE security_audit_log (
 );
 ```
 
-### Row Level Security (RLS)
+**Indexes:**
+- `security_audit_log_pkey` - Primary key on id
+- `idx_security_audit_log_user_id` - Index on user_id
+- `idx_security_audit_log_created_at` - Index on created_at DESC
+- `idx_security_audit_log_action` - Index on action
+- `idx_security_audit_log_allowed` - Index on allowed
 
-All tables have RLS enabled with policies ensuring users can only access their own data:
+**Constraints:**
+- `security_audit_log_pkey` - PRIMARY KEY (id)
 
+**RLS Policies:**
+- `Users can read own audit logs` - SELECT for authenticated users where user_id = auth.uid()
+- `System can insert audit logs` - INSERT for authenticated and anon users with CHECK (true)
+- `Admins can read audit logs` - SELECT for authenticated users with USING (false) - currently disabled
+
+**Foreign Keys:**
+- `security_audit_log_user_id_fkey` - FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+
+### Database Functions
+
+#### Token Management Functions
+
+##### `reset_daily_tokens()`
 ```sql
--- Example policy for writing_samples
-CREATE POLICY "Users can read own writing samples"
-  ON writing_samples
-  FOR SELECT
-  TO authenticated
-  USING (auth.uid() = user_id);
+CREATE OR REPLACE FUNCTION reset_daily_tokens()
+RETURNS void AS $$
+BEGIN
+  UPDATE users 
+  SET 
+    tokens_remaining = CASE 
+      WHEN subscription_tier = 'free' THEN LEAST(100000, 1000000 - COALESCE(monthly_tokens_used, 0))
+      ELSE tokens_remaining 
+    END,
+    daily_tokens_used = 0,
+    last_token_reset = CURRENT_DATE
+  WHERE 
+    subscription_tier = 'free' 
+    AND COALESCE(last_token_reset, '1970-01-01'::date) < CURRENT_DATE;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+##### `reset_monthly_tokens()`
+```sql
+CREATE OR REPLACE FUNCTION reset_monthly_tokens()
+RETURNS void AS $$
+BEGIN
+  UPDATE users 
+  SET 
+    monthly_tokens_used = 0,
+    monthly_exports_used = 0,
+    tokens_remaining = CASE 
+      WHEN subscription_tier = 'free' THEN 100000
+      WHEN subscription_tier = 'pro' THEN 5000000
+      WHEN subscription_tier = 'premium' THEN 10000000
+      ELSE tokens_remaining
+    END,
+    daily_tokens_used = CASE
+      WHEN subscription_tier = 'free' THEN 0
+      ELSE COALESCE(daily_tokens_used, 0)
+    END,
+    last_token_reset = CURRENT_DATE
+  WHERE should_reset_monthly_tokens(id);
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### Billing and Subscription Functions
+
+##### `get_next_billing_date(p_user_id uuid)`
+```sql
+CREATE OR REPLACE FUNCTION get_next_billing_date(p_user_id uuid)
+RETURNS timestamptz AS $$
+DECLARE
+  user_record users%ROWTYPE;
+  next_billing timestamptz;
+  billing_start timestamptz;
+BEGIN
+  SELECT * INTO user_record FROM users WHERE id = p_user_id;
+  
+  IF user_record.subscription_tier = 'free' THEN
+    RETURN NULL;
+  END IF;
+  
+  billing_start := COALESCE(user_record.billing_start_date, user_record.created_at);
+  
+  next_billing := billing_start;
+  WHILE next_billing <= CURRENT_TIMESTAMP LOOP
+    next_billing := next_billing + INTERVAL '1 month';
+  END LOOP;
+  
+  RETURN next_billing;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+##### `should_reset_monthly_tokens(p_user_id uuid)`
+```sql
+CREATE OR REPLACE FUNCTION should_reset_monthly_tokens(p_user_id uuid)
+RETURNS boolean AS $$
+DECLARE
+  user_record users%ROWTYPE;
+  billing_start timestamptz;
+  last_reset_date date;
+  current_billing_period_start timestamptz;
+BEGIN
+  SELECT * INTO user_record FROM users WHERE id = p_user_id;
+  
+  IF user_record.subscription_tier = 'free' THEN
+    RETURN EXTRACT(DAY FROM CURRENT_DATE) = user_record.monthly_reset_date
+           AND user_record.last_token_reset < CURRENT_DATE;
+  END IF;
+  
+  billing_start := COALESCE(user_record.billing_start_date, user_record.created_at);
+  last_reset_date := user_record.last_token_reset;
+  
+  current_billing_period_start := billing_start;
+  WHILE current_billing_period_start + INTERVAL '1 month' <= CURRENT_TIMESTAMP LOOP
+    current_billing_period_start := current_billing_period_start + INTERVAL '1 month';
+  END LOOP;
+  
+  RETURN last_reset_date < current_billing_period_start::date;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+##### `update_subscription_tier(user_id, tier, billing_start)`
+```sql
+CREATE OR REPLACE FUNCTION update_subscription_tier(
+  p_user_id uuid,
+  p_new_tier text,
+  p_billing_start timestamptz DEFAULT CURRENT_TIMESTAMP
+)
+RETURNS void AS $$
+BEGIN
+  UPDATE users 
+  SET 
+    subscription_tier = p_new_tier,
+    billing_start_date = CASE 
+      WHEN p_new_tier IN ('pro', 'premium') THEN p_billing_start
+      ELSE NULL
+    END,
+    tokens_remaining = CASE 
+      WHEN p_new_tier = 'free' THEN 100000
+      WHEN p_new_tier = 'pro' THEN 5000000
+      WHEN p_new_tier = 'premium' THEN 10000000
+      ELSE tokens_remaining
+    END,
+    monthly_tokens_used = 0,
+    daily_tokens_used = 0,
+    monthly_exports_used = 0,
+    last_token_reset = CURRENT_DATE
+  WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+#### Analytics Functions
+
+##### `get_rewrite_stats(p_user_id uuid)`
+```sql
+CREATE OR REPLACE FUNCTION get_rewrite_stats(p_user_id uuid)
+RETURNS TABLE(
+  total_rewrites bigint,
+  this_month bigint,
+  last_rewrite timestamptz
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    COUNT(*) as total_rewrites,
+    COUNT(*) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE)) as this_month,
+    MAX(created_at) as last_rewrite
+  FROM rewrite_history 
+  WHERE user_id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+#### Security Functions
+
+##### `log_security_event()`
+```sql
+CREATE OR REPLACE FUNCTION log_security_event(
+  p_user_id uuid,
+  p_action text,
+  p_resource text,
+  p_allowed boolean,
+  p_subscription_tier text,
+  p_ip_address text DEFAULT NULL,
+  p_user_agent text DEFAULT NULL,
+  p_error_message text DEFAULT NULL
+)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO security_audit_log (
+    user_id,
+    action,
+    resource,
+    allowed,
+    subscription_tier,
+    ip_address,
+    user_agent,
+    error_message
+  ) VALUES (
+    p_user_id,
+    p_action,
+    p_resource,
+    p_allowed,
+    p_subscription_tier,
+    p_ip_address,
+    p_user_agent,
+    p_error_message
+  );
+EXCEPTION
+  WHEN OTHERS THEN
+    NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+##### `validate_subscription_access()`
+```sql
+CREATE OR REPLACE FUNCTION validate_subscription_access(
+  p_user_id uuid,
+  p_action text,
+  p_required_tier text
+)
+RETURNS boolean AS $$
+DECLARE
+  user_tier text;
+  access_granted boolean := false;
+BEGIN
+  SELECT subscription_tier INTO user_tier
+  FROM users
+  WHERE id = p_user_id;
+
+  CASE p_required_tier
+    WHEN 'pro' THEN
+      access_granted := user_tier IN ('pro', 'premium');
+    WHEN 'premium' THEN
+      access_granted := user_tier = 'premium';
+    ELSE
+      access_granted := true;
+  END CASE;
+
+  PERFORM log_security_event(
+    p_user_id,
+    p_action,
+    'tone_controls',
+    access_granted,
+    COALESCE(user_tier, 'unknown'),
+    NULL,
+    NULL,
+    CASE WHEN NOT access_granted THEN 
+      format('Access denied: %s requires %s subscription, user has %s', 
+             p_action, p_required_tier, COALESCE(user_tier, 'no subscription'))
+    ELSE NULL END
+  );
+
+  RETURN access_granted;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+#### User Management Functions
+
+##### `handle_new_user()`
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.users (
+    id,
+    email,
+    subscription_tier,
+    tokens_remaining,
+    daily_tokens_used,
+    monthly_tokens_used,
+    monthly_exports_used,
+    last_token_reset,
+    monthly_reset_date
+  )
+  VALUES (
+    new.id,
+    new.email,
+    'free',
+    100000,
+    0,
+    0,
+    0,
+    CURRENT_DATE,
+    EXTRACT(DAY FROM CURRENT_DATE)
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+**Trigger:**
+```sql
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 ```
 
 ## Component Architecture
@@ -171,6 +544,8 @@ CREATE POLICY "Users can read own writing samples"
 
 #### `ToneControls.tsx`
 - Subscription-based tone adjustment interface
+- **Intelligent tone filtering**: Only shows controls available to user's tier
+- **Graceful degradation**: Handles unavailable controls without errors
 - Progressive feature unlocking (Free → Pro → Premium)
 - Preset management and custom fine-tuning
 
@@ -179,6 +554,14 @@ CREATE POLICY "Users can read own writing samples"
 - Cancellation and reactivation workflows based on billing cycles
 - Billing history and usage analytics
 - Enhanced status detection for expired subscriptions
+
+#### `RewriteHistoryModal.tsx`
+- **Enhanced export functionality**: Both bulk and individual item exports
+- **Comprehensive export tracking**: All exports update database and local state
+- **Tier-aware export limits**: Shows remaining exports for Free/Pro, unlimited for Premium
+- **Real-time export validation**: Prevents exceeding limits before file creation
+- Subscription-aware analytics display
+- **Individual export buttons**: Export single rewrites with proper tracking
 
 #### `RewriteHistoryStats.tsx`
 - Renamed from "Rewrite History & Analytics" to "Rewrite Summary"
@@ -191,6 +574,7 @@ CREATE POLICY "Users can read own writing samples"
 - Centralized authentication state management
 - Token usage tracking and validation with billing-based resets
 - **Enhanced export tracking**: Comprehensive logging, proper tier handling, and database synchronization
+- **Detailed security logging**: All export attempts logged with success/failure status
 - Enhanced error handling and user feedback
 - Rewrite history saving with comprehensive logging
 
@@ -215,14 +599,20 @@ CREATE POLICY "Users can read own writing samples"
 | Processing Speed | 1x | 2x | 3x |
 | Monthly Exports | 5 | 200 | Unlimited |
 
-### Export Tracking System
+### Enhanced Export Tracking System
 
-The export system has been completely redesigned for accuracy and reliability:
+The export system has been completely redesigned for accuracy and reliability across all export sources:
 
 #### Export Limits by Tier
 - **Free Tier**: 5 exports per month with strict enforcement
 - **Pro Tier**: 200 exports per month with usage monitoring
 - **Premium Tier**: Unlimited exports (tracked for analytics only)
+
+#### Export Sources Tracked
+1. **TextRewriter Component**: Export rewrite results
+2. **RewriteHistoryModal**: 
+   - Export all history (bulk export)
+   - Export individual rewrite items
 
 #### Export Tracking Implementation
 ```typescript
@@ -270,7 +660,7 @@ const updateExports = async (exportsUsed: number) => {
 ```
 
 #### Export Process Flow
-1. **User clicks export button**
+1. **User initiates export** (from TextRewriter or RewriteHistoryModal)
 2. **Pre-export validation**: Check tier limits and current usage
 3. **File generation**: Create export file with subscription-appropriate data
 4. **Database update**: Increment export count for Free/Pro users
@@ -373,6 +763,27 @@ const rewriteWithClaude = async (
 };
 ```
 
+### Enhanced Tone Control System
+
+The tone control system now includes intelligent filtering to prevent subscription-related errors:
+
+```typescript
+// Create filtered tone settings that only include available controls
+const limits = getSubscriptionLimits(user);
+const filteredToneSettings: ToneSettings = {
+  formality: 50, casualness: 50, enthusiasm: 50, technicality: 50,
+  creativity: 50, empathy: 50, confidence: 50, humor: 50, urgency: 50, clarity: 50
+};
+
+// Only include tone settings for controls available to the user's tier
+Object.keys(toneSettings).forEach(key => {
+  if (limits.availableToneControls.includes(key) || !limits.canModifyTone) {
+    filteredToneSettings[key as keyof ToneSettings] = toneSettings[key as keyof ToneSettings];
+  }
+  // For unavailable controls, keep default value (50)
+});
+```
+
 ### Fallback Mock System
 When Claude API is unavailable, the system uses a sophisticated mock that:
 - Simulates subscription-appropriate processing times
@@ -398,6 +809,44 @@ export const validateToneAccess = (user: User | null, action: string): void => {
       }
       break;
     // Additional validations...
+  }
+};
+```
+
+### Enhanced Tone Settings Validation
+```typescript
+export const validateToneSettings = (user: User | null, toneSettings: any): void => {
+  const limits = getSubscriptionLimits(user);
+
+  // Free users cannot modify any tone settings
+  if (!limits.canModifyTone) {
+    const hasCustomSettings = Object.keys(toneSettings).some(
+      key => Math.abs(toneSettings[key] - 50) > 5 // Allow 5% tolerance for auto-detection
+    );
+
+    if (hasCustomSettings) {
+      throw new Error('Custom tone settings require Pro or Premium subscription. Free users have view-only access.');
+    }
+    return;
+  }
+
+  // For Pro/Premium users, only validate significantly modified unavailable controls
+  const unavailableControlsInUse = Object.keys(toneSettings).filter(control => {
+    if (limits.availableToneControls.includes(control)) {
+      return false; // Control is available, no issue
+    }
+    
+    // Check if the control has been significantly modified from default
+    const value = toneSettings[control];
+    const defaultValue = 50;
+    const isSignificantlyModified = Math.abs(value - defaultValue) > 10; // Allow 10% tolerance
+    
+    return isSignificantlyModified;
+  });
+
+  if (unavailableControlsInUse.length > 0) {
+    const tierName = user?.subscription_tier === 'pro' ? 'Premium' : 'Pro or Premium';
+    throw new Error(`The following tone controls require ${tierName} subscription: ${unavailableControlsInUse.join(', ')}`);
   }
 };
 ```
@@ -484,7 +933,7 @@ npm run build
 - Authentication flow
 - Database operations
 - API integrations
-- **Export workflow testing**: End-to-end export process validation
+- **Export workflow testing**: End-to-end export process validation from all sources
 
 ### Security Testing
 - RLS policy validation
@@ -517,12 +966,12 @@ npm run build
 - [ ] Claude API key configured (if using)
 - [ ] Error monitoring setup
 - [ ] Performance monitoring enabled
-- [ ] Export tracking functionality tested
+- [ ] Export tracking functionality tested across all sources
 
 ### Monitoring & Analytics
 - **Error Tracking**: Comprehensive error logging
 - **Usage Analytics**: Token usage patterns and trends
-- **Export Analytics**: Export usage patterns by subscription tier
+- **Export Analytics**: Export usage patterns by subscription tier across all sources
 - **Performance Metrics**: Response times and user engagement
 - **Security Monitoring**: Failed authentication attempts and suspicious activity
 
@@ -574,9 +1023,17 @@ Handles subscription tier changes with proper billing date tracking.
 - **Symptoms**: Export counts not updating, incorrect limits shown
 - **Solutions**: 
   - Check database `monthly_exports_used` field updates
-  - Verify `updateExports` function is being called for all tiers
+  - Verify `updateExports` function is being called for all export sources
   - Review console logs for export tracking errors
   - Ensure RLS policies allow export count updates
+  - Test exports from both TextRewriter and RewriteHistoryModal
+
+#### Tone Control Errors
+- **Symptoms**: "Premium subscription required" errors for Pro users
+- **Solutions**:
+  - Check tone settings filtering in `secureRewriteText`
+  - Verify `availableToneControls` array for user's tier
+  - Ensure tone validation allows reasonable tolerance for defaults
 
 #### Rewrite History Not Saving
 - Check RLS policies on rewrite_history table
@@ -600,7 +1057,8 @@ Handles subscription tier changes with proper billing date tracking.
 console.log('Export attempt:', {
   userTier: user.subscription_tier,
   currentExports: user.monthly_exports_used,
-  hasResult: !!result
+  hasResult: !!result,
+  exportSource: 'TextRewriter' // or 'RewriteHistoryModal'
 });
 
 // Check database state
@@ -652,7 +1110,7 @@ console.log('Export limits:', limits);
 - **Performance Monitoring**: Track and optimize slow queries
 - **Security Updates**: Regular dependency updates and security patches
 - **Backup Verification**: Ensure data backup integrity
-- **Export Analytics Review**: Monitor export usage patterns and optimize limits
+- **Export Analytics Review**: Monitor export usage patterns and optimize limits across all sources
 
 ### Support Channels
 - **Documentation**: Comprehensive user and developer guides
