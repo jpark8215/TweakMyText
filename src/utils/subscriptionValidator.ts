@@ -142,11 +142,18 @@ export const validateToneSettings = (user: User | null, toneSettings: any): void
       creativity: 50, empathy: 50, confidence: 50, humor: 50, urgency: 50, clarity: 50
     };
     
-    const hasCustomSettings = Object.keys(toneSettings).some(
-      key => Math.abs(toneSettings[key] - (defaultSettings[key] || 50)) > 5 // Allow 5% tolerance for auto-detection
+    // For free users, we need to be more lenient with auto-detected settings
+    // Only throw error if they're trying to manually modify settings significantly
+    const hasSignificantCustomSettings = Object.keys(toneSettings).some(
+      key => {
+        const currentValue = toneSettings[key];
+        const defaultValue = defaultSettings[key] || 50;
+        // Allow larger tolerance for auto-detected settings (15 points)
+        return Math.abs(currentValue - defaultValue) > 15;
+      }
     );
 
-    if (hasCustomSettings) {
+    if (hasSignificantCustomSettings) {
       throw new Error('Custom tone settings require Pro or Premium subscription. Free users have view-only access.');
     }
     return;
