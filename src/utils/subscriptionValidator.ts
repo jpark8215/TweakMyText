@@ -152,14 +152,25 @@ export const validateToneSettings = (user: User | null, toneSettings: any): void
     return;
   }
 
-  // Check if user is trying to use tone controls not available in their tier
-  const unavailableControls = Object.keys(toneSettings).filter(
-    control => !limits.availableToneControls.includes(control)
-  );
+  // For Pro/Premium users, only validate if they're trying to use unavailable controls
+  // But only check controls that have been significantly modified from default (50)
+  const unavailableControlsInUse = Object.keys(toneSettings).filter(control => {
+    // Only check if this control is not available for their tier
+    if (limits.availableToneControls.includes(control)) {
+      return false; // Control is available, no issue
+    }
+    
+    // Check if the control has been significantly modified from default
+    const value = toneSettings[control];
+    const defaultValue = 50;
+    const isSignificantlyModified = Math.abs(value - defaultValue) > 10; // Allow 10% tolerance
+    
+    return isSignificantlyModified;
+  });
 
-  if (unavailableControls.length > 0) {
+  if (unavailableControlsInUse.length > 0) {
     const tierName = user?.subscription_tier === 'pro' ? 'Premium' : 'Pro or Premium';
-    throw new Error(`The following tone controls require ${tierName} subscription: ${unavailableControls.join(', ')}`);
+    throw new Error(`The following tone controls require ${tierName} subscription: ${unavailableControlsInUse.join(', ')}`);
   }
 };
 

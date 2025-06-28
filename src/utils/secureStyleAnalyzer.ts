@@ -133,10 +133,32 @@ export const secureRewriteText = async (
   toneSettings: ToneSettings,
   user: User | null
 ): Promise<RewriteResult> => {
-  // Validate user subscription and tone settings
-  validateToneSettings(user, toneSettings);
-  
+  // Create a filtered tone settings object that only includes available controls
   const limits = getSubscriptionLimits(user);
+  const filteredToneSettings: ToneSettings = {
+    formality: 50,
+    casualness: 50,
+    enthusiasm: 50,
+    technicality: 50,
+    creativity: 50,
+    empathy: 50,
+    confidence: 50,
+    humor: 50,
+    urgency: 50,
+    clarity: 50
+  };
+
+  // Only include tone settings for controls available to the user's tier
+  Object.keys(toneSettings).forEach(key => {
+    if (limits.availableToneControls.includes(key) || !limits.canModifyTone) {
+      filteredToneSettings[key as keyof ToneSettings] = toneSettings[key as keyof ToneSettings];
+    }
+    // For unavailable controls, keep default value (50)
+  });
+
+  // Validate the filtered tone settings
+  validateToneSettings(user, filteredToneSettings);
+  
   const analysisLevel = getAnalysisLevel(user);
   const processingPriority = getProcessingPriority(user);
 
@@ -150,14 +172,14 @@ export const secureRewriteText = async (
         validateToneAccess(user, 'priority_processing');
       }
       
-      return await rewriteWithClaude(originalText, samples, toneSettings, apiKey, analysisLevel, processingPriority);
+      return await rewriteWithClaude(originalText, samples, filteredToneSettings, apiKey, analysisLevel, processingPriority);
     } catch (error) {
       console.error('Claude API failed, falling back to mock:', error);
     }
   }
 
   // Fallback to secure mock implementation
-  return await secureRewriteTextMock(originalText, samples, toneSettings, user, analysisLevel, processingPriority);
+  return await secureRewriteTextMock(originalText, samples, filteredToneSettings, user, analysisLevel, processingPriority);
 };
 
 // Secure mock implementation with subscription-based features
