@@ -119,12 +119,12 @@ export const useAuth = () => {
 
       if (error && error.code === 'PGRST116') {
         console.log('User profile not found, creating new one...');
-        // User doesn't exist, create new profile
+        // User doesn't exist, create new profile with correct free tier limits
         const newUser = {
           id: authUser.id,
           email: authUser.email!,
           subscription_tier: 'free' as const,
-          tokens_remaining: 100000, // Daily limit for free tier
+          tokens_remaining: 100000, // 100K daily limit for free tier
           daily_tokens_used: 0,
           monthly_tokens_used: 0,
           monthly_exports_used: 0,
@@ -170,14 +170,42 @@ export const useAuth = () => {
         console.error('Database error fetching user profile:', error);
         throw error;
       } else {
+        // Validate and fix token amounts based on subscription tier
+        let correctedData = { ...data };
+        let needsUpdate = false;
+
+        // Check if tokens_remaining is correct for the subscription tier
+        const expectedTokens = getExpectedTokensForTier(data.subscription_tier);
+        if (data.tokens_remaining > expectedTokens.monthly) {
+          console.log(`Correcting tokens for ${data.subscription_tier} user: ${data.tokens_remaining} -> ${expectedTokens.daily || expectedTokens.monthly}`);
+          correctedData.tokens_remaining = expectedTokens.daily || expectedTokens.monthly;
+          needsUpdate = true;
+        }
+
+        // Update database if corrections are needed
+        if (needsUpdate) {
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({
+              tokens_remaining: correctedData.tokens_remaining,
+            })
+            .eq('id', authUser.id);
+
+          if (updateError) {
+            console.error('Failed to update corrected user data:', updateError);
+          } else {
+            console.log('User token amounts corrected in database');
+          }
+        }
+
         const userProfile = {
-          ...data,
-          created_at: new Date(data.created_at),
-          subscription_expires_at: data.subscription_expires_at 
-            ? new Date(data.subscription_expires_at) 
+          ...correctedData,
+          created_at: new Date(correctedData.created_at),
+          subscription_expires_at: correctedData.subscription_expires_at 
+            ? new Date(correctedData.subscription_expires_at) 
             : undefined,
-          billing_start_date: data.billing_start_date 
-            ? new Date(data.billing_start_date) 
+          billing_start_date: correctedData.billing_start_date 
+            ? new Date(correctedData.billing_start_date) 
             : undefined,
         };
         
@@ -198,6 +226,20 @@ export const useAuth = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to get expected token amounts for each tier
+  const getExpectedTokensForTier = (tier: string) => {
+    switch (tier) {
+      case 'free':
+        return { daily: 100000, monthly: 1000000 }; // 100K daily, 1M monthly
+      case 'pro':
+        return { daily: null, monthly: 5000000 }; // No daily limit, 5M monthly
+      case 'premium':
+        return { daily: null, monthly: 10000000 }; // No daily limit, 10M monthly
+      default:
+        return { daily: 100000, monthly: 1000000 }; // Default to free tier
     }
   };
 
@@ -378,7 +420,7 @@ export const useAuth = () => {
       subscriptionTier: user.subscription_tier,
     });
 
-    // Get subscription limits
+    // Get subscription limits with corrected values
     const getSubscriptionLimits = () => {
       switch (user.subscription_tier) {
         case 'pro':
@@ -386,7 +428,7 @@ export const useAuth = () => {
         case 'premium':
           return { dailyLimit: -1, monthlyLimit: 10000000 }; // No daily limit for Premium
         default:
-          return { dailyLimit: 100000, monthlyLimit: 1000000 }; // Free tier
+          return { dailyLimit: 100000, monthlyLimit: 1000000 }; // Free tier: 100K daily, 1M monthly
       }
     };
 
@@ -429,7 +471,7 @@ export const useAuth = () => {
             .update({ 
               monthly_tokens_used: 0,
               monthly_exports_used: 0,
-              tokens_remaining: 100000,
+              tokens_remaining: 100000, // Reset to daily limit for free tier
               daily_tokens_used: 0
             })
             .eq('id', user.id);

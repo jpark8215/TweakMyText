@@ -47,7 +47,7 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         processingPriority: 'premium',
         maxWritingSamples: 100,
         dailyLimit: -1, // Unlimited
-        monthlyLimit: 10000000,
+        monthlyLimit: 10000000, // 10M tokens
         exportLimit: -1, // Unlimited
         availableToneControls: [
           'formality', 'casualness', 'enthusiasm', 'technicality', 
@@ -66,7 +66,7 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         processingPriority: 'priority',
         maxWritingSamples: 25,
         dailyLimit: -1, // Unlimited
-        monthlyLimit: 5000000,
+        monthlyLimit: 5000000, // 5M tokens
         exportLimit: 200,
         availableToneControls: [
           'formality', 'casualness', 'enthusiasm', 'technicality', 'creativity', 'empathy'
@@ -83,8 +83,8 @@ export const getSubscriptionLimits = (user: User | null): SubscriptionLimits => 
         hasPriorityProcessing: false,
         processingPriority: 'standard',
         maxWritingSamples: 3,
-        dailyLimit: 100000,
-        monthlyLimit: 1000000,
+        dailyLimit: 100000, // 100K daily limit
+        monthlyLimit: 1000000, // 1M monthly limit (CORRECTED)
         exportLimit: 5,
         availableToneControls: [], // View-only, no modification
         maxToneControls: 0,
