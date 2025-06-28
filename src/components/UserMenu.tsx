@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, LogOut, Settings, Zap, Crown, Shield } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -6,13 +6,39 @@ interface UserMenuProps {
   onOpenSettings?: () => void;
   onManageSubscription?: () => void;
   onOpenPricing?: () => void;
-  onOpenAdmin?: () => void; // NEW: Admin panel trigger
+  onOpenAdmin?: () => void;
 }
 
 export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenPricing, onOpenAdmin }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const { user, signOut } = useAuth();
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(false);
+  const { user, signOut, isAdmin } = useAuth();
+
+  // Check admin status when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      checkAdminStatus();
+    } else {
+      setIsAdminUser(false);
+    }
+  }, [user]);
+
+  const checkAdminStatus = async () => {
+    if (!user) return;
+    
+    setCheckingAdmin(true);
+    try {
+      const adminStatus = await isAdmin();
+      setIsAdminUser(adminStatus);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdminUser(false);
+    } finally {
+      setCheckingAdmin(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -96,8 +122,11 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
           <div className="text-gray-800 text-sm font-medium truncate max-w-32">
             {user.email}
           </div>
-          <div className={`text-xs ${getTierColor(user.subscription_tier)}`}>
+          <div className={`text-xs ${getTierColor(user.subscription_tier)} flex items-center gap-1`}>
             {getTierBadge(user.subscription_tier)}
+            {isAdminUser && (
+              <Shield className="w-3 h-3 text-red-500" title="Admin User" />
+            )}
           </div>
         </div>
       </button>
@@ -118,8 +147,14 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
                   <div className="text-gray-800 font-medium truncate">
                     {user.email}
                   </div>
-                  <div className={`text-sm ${getTierColor(user.subscription_tier)}`}>
+                  <div className={`text-sm ${getTierColor(user.subscription_tier)} flex items-center gap-1`}>
                     {getTierBadge(user.subscription_tier)} Plan
+                    {isAdminUser && (
+                      <div className="flex items-center gap-1 ml-2">
+                        <Shield className="w-3 h-3 text-red-500" />
+                        <span className="text-xs text-red-600">Admin</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -159,14 +194,22 @@ export default function UserMenu({ onOpenSettings, onManageSubscription, onOpenP
                 </button>
               )}
 
-              {/* Admin Panel Button - Testing Mode */}
-              <button
-                onClick={handleAdminClick}
-                className="w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors text-left"
-              >
-                <Shield className="w-4 h-4" />
-                Admin Panel (Testing)
-              </button>
+              {/* Admin Panel Button - Only show for admin users */}
+              {isAdminUser && (
+                <>
+                  <hr className="my-2 border-gray-200" />
+                  <button
+                    onClick={handleAdminClick}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors text-left"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <div className="flex flex-col items-start">
+                      <span>Admin Panel</span>
+                      <span className="text-xs text-red-500">Testing Mode</span>
+                    </div>
+                  </button>
+                </>
+              )}
               
               <hr className="my-2 border-gray-200" />
               

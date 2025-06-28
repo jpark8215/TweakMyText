@@ -65,6 +65,13 @@ TweakMyText is a sophisticated AI-powered writing style rewriter that learns fro
 - **Graceful degradation**: Unavailable controls default to neutral (50) without errors
 - **Subscription-aware validation**: Prevents errors when Pro users have Premium-only controls in their settings
 
+### 8. **Admin Panel & Role Management** 🆕
+- **Database-level admin roles**: Secure admin status stored in Supabase
+- **Admin-only access**: Admin panel only visible to verified admin users
+- **Comprehensive audit logging**: All admin actions tracked with timestamps
+- **Subscription testing**: Bypass payment for testing different subscription tiers
+- **Security-first design**: Multiple layers of validation and access control
+
 ## Database Schema
 
 ### Core Tables
@@ -83,7 +90,12 @@ CREATE TABLE users (
   monthly_reset_date integer DEFAULT EXTRACT(day FROM CURRENT_DATE),
   subscription_expires_at timestamptz,
   billing_start_date timestamptz, -- When paid subscription billing started
-  created_at timestamptz DEFAULT now()
+  created_at timestamptz DEFAULT now(),
+  -- Admin role management
+  is_admin boolean DEFAULT false,
+  admin_notes text,
+  admin_granted_at timestamptz,
+  admin_granted_by uuid REFERENCES users(id)
 );
 ```
 
@@ -107,6 +119,7 @@ CREATE TABLE users (
 
 **Foreign Keys:**
 - `users_id_fkey` - FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+- `users_admin_granted_by_fkey` - FOREIGN KEY (admin_granted_by) REFERENCES users(id)
 
 #### `writing_samples`
 ```sql
@@ -233,7 +246,161 @@ CREATE TABLE security_audit_log (
 **Foreign Keys:**
 - `security_audit_log_user_id_fkey` - FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 
+#### `admin_audit_log` 🆕
+```sql
+CREATE TABLE admin_audit_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  action text NOT NULL,
+  details jsonb,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+**Indexes:**
+- `admin_audit_log_pkey` - Primary key on id
+- `idx_admin_audit_log_admin_user_id` - Index on admin_user_id
+- `idx_admin_audit_log_target_user_id` - Index on target_user_id
+- `idx_admin_audit_log_created_at` - Index on created_at DESC
+- `idx_admin_audit_log_action` - Index on action
+
+**Constraints:**
+- `admin_audit_log_pkey` - PRIMARY KEY (id)
+
+**RLS Policies:**
+- `Admins can read admin audit logs` - SELECT for authenticated users where user is admin
+- `System can insert admin audit logs` - INSERT with CHECK (true)
+
+**Foreign Keys:**
+- `admin_audit_log_admin_user_id_fkey` - FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+- `admin_audit_log_target_user_id_fkey` - FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE SET NULL
+
 ### Database Functions
+
+#### Admin Management Functions 🆕
+
+##### `is_user_admin(p_user_id uuid)`
+```sql
+CREATE OR REPLACE FUNCTION is_user_admin(p_user_id uuid DEFAULT auth.uid())
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM users 
+    WHERE id = p_user_id 
+    AND is_admin = true
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+##### `grant_admin_access(p_target_user_id uuid, p_notes text)`
+```sql
+CREATE OR REPLACE FUNCTION grant_admin_access(
+  p_target_user_id uuid,
+  p_notes text DEFAULT NULL
+)
+RETURNS void AS $$
+DECLARE
+  current_user_id uuid := auth.uid();
+BEGIN
+  -- Check if current user is admin
+  IF NOT is_user_admin(current_user_id) THEN
+    RAISE EXCEPTION 'Access denied: Only admins can grant admin access';
+  END IF;
+
+  -- Update target user
+  UPDATE users 
+  SET 
+    is_admin = true,
+    admin_notes = p_notes,
+    admin_granted_at = now(),
+    admin_granted_by = current_user_id
+  WHERE id = p_target_user_id;
+
+  -- Log the action
+  PERFORM log_admin_action(
+    current_user_id,
+    p_target_user_id,
+    'grant_admin_access',
+    jsonb_build_object('notes', p_notes)
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+##### `revoke_admin_access(p_target_user_id uuid, p_reason text)`
+```sql
+CREATE OR REPLACE FUNCTION revoke_admin_access(
+  p_target_user_id uuid,
+  p_reason text DEFAULT NULL
+)
+RETURNS void AS $$
+DECLARE
+  current_user_id uuid := auth.uid();
+BEGIN
+  -- Check if current user is admin
+  IF NOT is_user_admin(current_user_id) THEN
+    RAISE EXCEPTION 'Access denied: Only admins can revoke admin access';
+  END IF;
+
+  -- Prevent self-revocation
+  IF current_user_id = p_target_user_id THEN
+    RAISE EXCEPTION 'Cannot revoke your own admin access';
+  END IF;
+
+  -- Update target user
+  UPDATE users 
+  SET 
+    is_admin = false,
+    admin_notes = p_reason,
+    admin_granted_at = NULL,
+    admin_granted_by = NULL
+  WHERE id = p_target_user_id;
+
+  -- Log the action
+  PERFORM log_admin_action(
+    current_user_id,
+    p_target_user_id,
+    'revoke_admin_access',
+    jsonb_build_object('reason', p_reason)
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+##### `log_admin_action()`
+```sql
+CREATE OR REPLACE FUNCTION log_admin_action(
+  p_admin_user_id uuid,
+  p_target_user_id uuid,
+  p_action text,
+  p_details jsonb DEFAULT NULL,
+  p_ip_address text DEFAULT NULL,
+  p_user_agent text DEFAULT NULL
+)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO admin_audit_log (
+    admin_user_id,
+    target_user_id,
+    action,
+    details,
+    ip_address,
+    user_agent
+  ) VALUES (
+    p_admin_user_id,
+    p_target_user_id,
+    p_action,
+    p_details,
+    p_ip_address,
+    p_user_agent
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
 
 #### Token Management Functions
 
@@ -341,7 +508,7 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
-##### `update_subscription_tier(user_id, tier, billing_start)`
+##### `update_subscription_tier(user_id, tier, billing_start)` 🆕 Enhanced
 ```sql
 CREATE OR REPLACE FUNCTION update_subscription_tier(
   p_user_id uuid,
@@ -349,7 +516,22 @@ CREATE OR REPLACE FUNCTION update_subscription_tier(
   p_billing_start timestamptz DEFAULT CURRENT_TIMESTAMP
 )
 RETURNS void AS $$
+DECLARE
+  current_user_id uuid := auth.uid();
+  old_tier text;
+  is_admin_action boolean := false;
 BEGIN
+  -- Get current tier
+  SELECT subscription_tier INTO old_tier FROM users WHERE id = p_user_id;
+
+  -- Check if this is an admin action (admin changing someone else's tier)
+  IF current_user_id != p_user_id AND is_user_admin(current_user_id) THEN
+    is_admin_action := true;
+  ELSIF current_user_id != p_user_id THEN
+    RAISE EXCEPTION 'Access denied: Cannot modify another user''s subscription';
+  END IF;
+
+  -- Update subscription tier and billing start date
   UPDATE users 
   SET 
     subscription_tier = p_new_tier,
@@ -368,6 +550,20 @@ BEGIN
     monthly_exports_used = 0,
     last_token_reset = CURRENT_DATE
   WHERE id = p_user_id;
+
+  -- Log admin action if applicable
+  IF is_admin_action THEN
+    PERFORM log_admin_action(
+      current_user_id,
+      p_user_id,
+      'update_subscription_tier',
+      jsonb_build_object(
+        'old_tier', old_tier,
+        'new_tier', p_new_tier,
+        'billing_start', p_billing_start
+      )
+    );
+  END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
@@ -496,7 +692,8 @@ BEGIN
     monthly_tokens_used,
     monthly_exports_used,
     last_token_reset,
-    monthly_reset_date
+    monthly_reset_date,
+    is_admin
   )
   VALUES (
     new.id,
@@ -507,7 +704,8 @@ BEGIN
     0,
     0,
     CURRENT_DATE,
-    EXTRACT(DAY FROM CURRENT_DATE)
+    EXTRACT(DAY FROM CURRENT_DATE),
+    false
   );
   RETURN new;
 END;
@@ -528,7 +726,8 @@ CREATE TRIGGER on_auth_user_created
 #### `App.tsx`
 - Main application component with routing logic
 - Handles authentication state and view management
-- Manages global modals (auth, settings, pricing)
+- Manages global modals (auth, settings, pricing, admin)
+- **Admin integration**: Conditionally shows admin panel based on user permissions
 
 #### `StyleCapture.tsx`
 - Writing sample collection and management
@@ -578,6 +777,19 @@ CREATE TRIGGER on_auth_user_created
 - Prevents race conditions with AbortController
 - Provides clear feedback on password change status
 
+#### `UserMenu.tsx` 🆕 Enhanced
+- **Admin status detection**: Checks user admin status on mount
+- **Conditional admin menu**: Only shows admin panel option for verified admin users
+- **Visual admin indicators**: Shield icon and "Admin" badge for admin users
+- **Security-first approach**: Admin status verified before showing menu option
+
+#### `AdminPanel.tsx` 🆕
+- **Access verification**: Checks admin status before showing panel content
+- **Subscription testing**: Allows admins to test different subscription tiers
+- **Audit logging**: All admin actions logged with comprehensive details
+- **Security barriers**: Multiple layers of access validation
+- **Testing interface**: User-friendly interface for bypassing payment during testing
+
 ### Authentication & Security
 
 #### `useAuth.ts`
@@ -588,11 +800,13 @@ CREATE TRIGGER on_auth_user_created
 - **Detailed security logging**: All export attempts logged with success/failure status
 - Enhanced error handling and user feedback
 - Rewrite history saving with comprehensive logging
+- **Admin status checking**: New `isAdmin()` function for role verification
 
 #### Security Features
 - **Row Level Security**: Database-level access control
 - **Subscription Validation**: Server-side feature access validation
 - **Audit Logging**: Comprehensive security event tracking
+- **Admin Role Management**: Secure admin role assignment and verification
 - **Rate Limiting**: Protection against abuse
 - **Input Validation**: Client and server-side validation
 - **Secure Logging**: Sanitizes sensitive information in logs
@@ -617,6 +831,45 @@ CREATE TRIGGER on_auth_user_created
 - **Proper error handling**: Standardized error handling for all export operations
 - **Comprehensive logging**: Detailed logging of all export attempts
 
+## Admin System 🆕
+
+### Admin Role Management
+
+#### Setting Up First Admin
+Since this is a new admin system, you'll need to manually grant admin access to the first user:
+
+```sql
+-- Set your email as admin (replace with your actual email)
+UPDATE users 
+SET is_admin = true, admin_granted_at = now() 
+WHERE email = 'your-admin-email@example.com';
+```
+
+#### Admin Features
+- **Subscription Testing**: Bypass payment to test different subscription tiers
+- **User Management**: Grant/revoke admin access to other users
+- **Audit Trail**: Complete logging of all admin actions
+- **Security Validation**: Multiple layers of access control
+
+#### Admin Panel Access
+- **Database Verification**: Admin status verified against database
+- **UI Conditional Rendering**: Admin menu only shows for verified admins
+- **Access Denied Handling**: Clear messaging for non-admin users
+- **Loading States**: Proper UX during admin status verification
+
+#### Admin Security Features
+- **Self-Protection**: Admins cannot revoke their own access
+- **Audit Logging**: All admin actions logged with timestamps and details
+- **Access Control**: Only database-verified admins can access admin functions
+- **Secure by Default**: New users are non-admin by default
+
+### Admin Audit Trail
+All admin actions are logged in the `admin_audit_log` table with:
+- Admin user ID and target user ID
+- Action type and detailed parameters
+- Timestamp and optional IP/user agent tracking
+- JSON details for complex operations
+
 ## Subscription System
 
 ### Tier Comparison
@@ -630,6 +883,9 @@ CREATE TRIGGER on_auth_user_created
 | Rewrite History | No | Yes | Yes + Analytics |
 | Processing Speed | 1x | 2x | 3x |
 | Monthly Exports | 5 | 200 | Unlimited |
+| Admin Panel Access | No | No | No* |
+
+*Admin access is role-based, not subscription-based
 
 ### Enhanced Export Tracking System
 
@@ -776,7 +1032,7 @@ The system tracks detailed subscription status including:
 
 - `get_next_billing_date(user_id)`: Calculates next billing based on billing start date
 - `should_reset_monthly_tokens(user_id)`: Determines if monthly reset is due based on billing cycles
-- `update_subscription_tier(user_id, tier, billing_start)`: Handles tier changes with proper billing date tracking
+- `update_subscription_tier(user_id, tier, billing_start)`: Handles tier changes with proper billing date tracking and admin logging
 
 #### How It Works
 
@@ -785,6 +1041,7 @@ The system tracks detailed subscription status including:
 3. **New Subscriptions**: Billing start date is set when upgrading to paid tier
 4. **Cancellations**: End at next billing date calculated from billing start
 5. **Reactivations**: Start new billing cycle from reactivation date
+6. **Admin Changes**: All admin-initiated tier changes are logged in audit trail
 
 ## AI Integration
 
@@ -912,6 +1169,43 @@ export const validateToneSettings = (user: User | null, toneSettings: any): void
 };
 ```
 
+### Admin Security Implementation 🆕
+```typescript
+// Admin status verification
+export const checkAdminStatus = async (user: User | null): Promise<boolean> => {
+  if (!user) return false;
+  
+  try {
+    const { data, error } = await supabase.rpc('is_user_admin', { p_user_id: user.id });
+    
+    if (error) {
+      secureLog('Error checking admin status:', { error: error.message });
+      return false;
+    }
+    
+    return data || false;
+  } catch (error) {
+    secureLog('Exception checking admin status:', { error });
+    return false;
+  }
+};
+
+// Admin action logging
+export const logAdminAction = async (
+  adminUserId: string,
+  targetUserId: string,
+  action: string,
+  details?: any
+): Promise<void> => {
+  await supabase.rpc('log_admin_action', {
+    p_admin_user_id: adminUserId,
+    p_target_user_id: targetUserId,
+    p_action: action,
+    p_details: details ? JSON.stringify(details) : null
+  });
+};
+```
+
 ### Security Logging
 ```typescript
 export const logSecurityEvent = async (event: SecurityEvent): Promise<void> => {
@@ -1002,11 +1296,13 @@ export const sanitizeContent = (content: string): string => {
 - **Clear Status Indicators**: Subscription status, cancellation tracking, and expiration dates are prominently displayed
 - **Intuitive Navigation**: Logical flow from style capture to rewriting to history management
 - **Accessibility**: Proper contrast ratios, keyboard navigation, and screen reader support
+- **Admin UX**: Clear admin indicators and secure access patterns
 
 ### Button Layout
 - **Centered Controls**: Tone controls, rewrite summary, and view history buttons are centered
 - **Consistent Styling**: All control buttons use white/gray background with proper hover states
 - **Clear Hierarchy**: Primary actions (rewrite) use gradient backgrounds, secondary actions use neutral colors
+- **Admin Styling**: Admin panel uses distinct red/pink gradients to indicate elevated privileges
 
 ## Development Setup
 
@@ -1049,6 +1345,12 @@ npm run test
 2. Run migrations in order from `supabase/migrations/`
 3. Enable RLS on all tables
 4. Configure authentication settings
+5. **Set up first admin user**:
+   ```sql
+   UPDATE users 
+   SET is_admin = true, admin_granted_at = now() 
+   WHERE email = 'your-admin-email@example.com';
+   ```
 
 ## Testing Strategy
 
@@ -1057,17 +1359,26 @@ npm run test
 - Utility function validation
 - Subscription logic verification
 - **Export tracking validation**: Test export limits and database updates
+- **Admin role verification**: Test admin status checking and access control
 
 ### Integration Testing
 - Authentication flow
 - Database operations
 - API integrations
 - **Export workflow testing**: End-to-end export process validation from all sources
+- **Admin workflow testing**: Complete admin panel functionality testing
 
 ### Security Testing
 - RLS policy validation
 - Subscription bypass attempts
 - Input validation and sanitization
+- **Admin access control testing**: Verify admin-only features are properly secured
+
+### Admin Testing 🆕
+- **Role-based access**: Verify admin panel only shows for admin users
+- **Subscription testing**: Test all subscription tier changes through admin panel
+- **Audit logging**: Verify all admin actions are properly logged
+- **Security barriers**: Test access denial for non-admin users
 
 ## Performance Optimization
 
@@ -1075,17 +1386,20 @@ npm run test
 - **Code Splitting**: Lazy loading of components
 - **Memoization**: React.memo for expensive components like ToneControls
 - **Bundle Optimization**: Vite's built-in optimizations
+- **Admin Panel Optimization**: Conditional loading and rendering
 
 ### Database Optimizations
 - **Indexes**: Strategic indexing on frequently queried columns
 - **RLS Optimization**: Efficient policy design
 - **Connection Pooling**: Supabase's built-in pooling
 - **Pagination**: Implemented in RewriteHistoryModal to prevent loading all history at once
+- **Admin Query Optimization**: Efficient admin status checking and audit log queries
 
 ### Caching Strategy
 - **Browser Caching**: Static assets with proper headers
 - **API Response Caching**: Subscription status and user data
 - **Local Storage**: Non-sensitive user preferences
+- **Admin Status Caching**: Cache admin status checks to reduce database queries
 
 ## Deployment
 
@@ -1098,6 +1412,8 @@ npm run test
 - [ ] Performance monitoring enabled
 - [ ] Export tracking functionality tested across all sources
 - [ ] Password change flow tested with timeout handling
+- [ ] **Admin system tested**: First admin user configured and panel access verified
+- [ ] **Admin audit logging verified**: All admin actions properly logged
 
 ### Monitoring & Analytics
 - **Error Tracking**: Comprehensive error logging
@@ -1105,6 +1421,7 @@ npm run test
 - **Export Analytics**: Export usage patterns by subscription tier across all sources
 - **Performance Metrics**: Response times and user engagement
 - **Security Monitoring**: Failed authentication attempts and suspicious activity
+- **Admin Activity Monitoring**: Track admin actions and access patterns
 
 ## API Documentation
 
@@ -1134,7 +1451,38 @@ Resets daily token usage for free users when appropriate.
 Resets monthly token usage based on billing cycles (Pro/Premium) or user anniversary dates (Free).
 
 #### `update_subscription_tier(user_id, tier, billing_start)`
-Handles subscription tier changes with proper billing date tracking.
+Handles subscription tier changes with proper billing date tracking and admin action logging.
+
+#### Admin Functions 🆕
+
+#### `is_user_admin(p_user_id uuid)`
+Checks if a user has admin privileges:
+```sql
+RETURN EXISTS (
+  SELECT 1 FROM users 
+  WHERE id = p_user_id 
+  AND is_admin = true
+);
+```
+
+#### `grant_admin_access(p_target_user_id uuid, p_notes text)`
+Grants admin access to a user (admin only):
+- Validates current user is admin
+- Updates target user admin status
+- Logs the action in admin audit trail
+
+#### `revoke_admin_access(p_target_user_id uuid, p_reason text)`
+Revokes admin access from a user (admin only):
+- Validates current user is admin
+- Prevents self-revocation
+- Updates target user admin status
+- Logs the action in admin audit trail
+
+#### `log_admin_action(admin_id, target_id, action, details)`
+Logs admin actions for audit trail:
+- Records admin user, target user, action type
+- Stores detailed parameters as JSON
+- Includes timestamp and optional metadata
 
 ## Troubleshooting
 
@@ -1184,11 +1532,28 @@ Handles subscription tier changes with proper billing date tracking.
 - Check cancellation status detection logic
 - Ensure proper grace period calculations based on billing start dates
 
+#### Admin Panel Issues 🆕
+- **Symptoms**: Admin panel not showing for admin users
+- **Solutions**:
+  - Verify user has `is_admin = true` in database
+  - Check `isAdmin()` function is working correctly
+  - Ensure admin status is being checked on component mount
+  - Verify RLS policies allow admin status queries
+
+#### Admin Access Denied
+- **Symptoms**: "Access Denied" message when trying to access admin panel
+- **Solutions**:
+  - Confirm user is marked as admin in database
+  - Check `is_user_admin()` function returns true for the user
+  - Verify admin status checking logic in UserMenu component
+  - Test admin status API call in browser console
+
 ### Debug Tools
 - Browser developer tools for client-side debugging
 - Supabase dashboard for database inspection
 - Security audit log for access control debugging
 - **Export tracking logs**: Console logs in browser for export process debugging
+- **Admin audit log**: Check admin_audit_log table for admin action history
 
 ### Export Tracking Debugging
 ```typescript
@@ -1210,6 +1575,23 @@ const limits = getSubscriptionLimits(user);
 console.log('Export limits:', limits);
 ```
 
+### Admin System Debugging 🆕
+```typescript
+// Check admin status in browser console
+const adminStatus = await isAdmin();
+console.log('Admin status:', adminStatus);
+
+// Verify admin database state
+SELECT id, email, is_admin, admin_granted_at, admin_granted_by 
+FROM users 
+WHERE email = 'your-email@example.com';
+
+// Check admin audit log
+SELECT * FROM admin_audit_log 
+WHERE admin_user_id = 'user-id' 
+ORDER BY created_at DESC;
+```
+
 ## Contributing
 
 ### Code Standards
@@ -1218,14 +1600,16 @@ console.log('Export limits:', limits);
 - **Prettier**: Consistent code formatting
 - **Conventional Commits**: Structured commit messages
 - **Unit Tests**: Required for critical functionality
+- **Admin Testing**: Required for all admin-related features
 
 ### Pull Request Process
 1. Create feature branch from main
 2. Implement changes with tests
 3. Update documentation as needed
-4. Submit PR with detailed description
-5. Address review feedback
-6. Merge after approval
+4. **Test admin functionality** if applicable
+5. Submit PR with detailed description
+6. Address review feedback
+7. Merge after approval
 
 ## Future Enhancements
 
@@ -1236,12 +1620,21 @@ console.log('Export limits:', limits);
 - **Advanced Analytics**: Detailed writing improvement insights
 - **API Access**: RESTful API for third-party integrations
 - **Enhanced Export Formats**: PDF, DOCX, and other formats for Premium users
+- **Advanced Admin Features**: User management, system monitoring, and analytics
 
 ### Technical Improvements
 - **Real-time Collaboration**: WebSocket-based live editing
 - **Offline Support**: Progressive Web App capabilities
 - **Mobile App**: React Native implementation
 - **Advanced AI**: Custom model fine-tuning for enterprise users
+- **Enhanced Admin Dashboard**: Comprehensive system monitoring and user management
+
+### Admin System Enhancements 🆕
+- **User Management Interface**: Admin UI for managing all users
+- **System Analytics**: Usage patterns and performance metrics
+- **Bulk Operations**: Mass user management and subscription changes
+- **Advanced Audit Trail**: Enhanced filtering and reporting
+- **Role Hierarchy**: Multiple admin levels with different permissions
 
 ## Support & Maintenance
 
@@ -1251,13 +1644,15 @@ console.log('Export limits:', limits);
 - **Security Updates**: Regular dependency updates and security patches
 - **Backup Verification**: Ensure data backup integrity
 - **Export Analytics Review**: Monitor export usage patterns and optimize limits across all sources
+- **Admin Activity Review**: Monitor admin actions and ensure proper usage
 
 ### Support Channels
 - **Documentation**: Comprehensive user and developer guides
 - **Community Forum**: User-to-user support and feature requests
 - **Email Support**: Direct support for Pro and Premium users
 - **Priority Support**: Dedicated support for Premium users
+- **Admin Support**: Specialized support for admin users and system administrators
 
 ---
 
-This documentation provides a comprehensive overview of the TweakMyText application architecture, implementation details, and operational procedures. For specific implementation questions or support, refer to the inline code comments and type definitions throughout the codebase.
+This documentation provides a comprehensive overview of the TweakMyText application architecture, implementation details, and operational procedures, including the new admin role management system. For specific implementation questions or support, refer to the inline code comments and type definitions throughout the codebase.
