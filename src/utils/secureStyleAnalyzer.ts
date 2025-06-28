@@ -182,7 +182,7 @@ export const secureRewriteText = async (
   return await secureRewriteTextMock(originalText, samples, filteredToneSettings, user, analysisLevel, processingPriority);
 };
 
-// Secure mock implementation with subscription-based features
+// Enhanced mock implementation with varied and realistic rewrites
 const secureRewriteTextMock = async (
   originalText: string,
   samples: WritingSample[],
@@ -201,75 +201,354 @@ const secureRewriteTextMock = async (
   // Analyze style with subscription-appropriate level
   const styleTags = analyzeWritingStyleSecure(samples, analysisLevel);
   
-  // Mock rewriting logic with subscription-based quality
+  // Enhanced mock rewriting logic with varied transformations
   let rewritten = originalText;
   let confidence = 70; // Base confidence
   
-  // Basic transformations for all users
-  if (styleTags.includes('casual') && toneSettings.casualness > 60) {
-    rewritten = rewritten
-      .replace(/\bhowever\b/gi, 'but')
-      .replace(/\btherefore\b/gi, 'so');
-  }
+  // Create a transformation context based on samples and tone settings
+  const transformationContext = createTransformationContext(samples, toneSettings, styleTags);
   
-  // Advanced transformations for Pro/Premium users
-  if (analysisLevel === 'advanced' || analysisLevel === 'extended') {
-    confidence += 10; // Higher confidence with advanced analysis
-    
-    if (styleTags.includes('formal') && toneSettings.formality > 60) {
-      rewritten = rewritten
-        .replace(/\bbut\b/gi, 'however')
-        .replace(/\bso\b/gi, 'therefore');
-    }
-
-    // Apply Pro-tier tone controls
-    if (toneSettings.creativity > 70) {
-      rewritten = rewritten.replace(/\bgood\b/gi, 'innovative');
-    }
-    
-    if (toneSettings.empathy > 70) {
-      rewritten = rewritten.replace(/\bI think\b/gi, 'I understand that');
-    }
-  }
+  // Apply comprehensive transformations
+  rewritten = applyAdvancedTransformations(rewritten, transformationContext, analysisLevel);
   
-  // Extended transformations for Premium users only
-  if (analysisLevel === 'extended') {
-    confidence += 10; // Highest confidence with extended analysis
-    
-    if (styleTags.includes('enthusiastic') && toneSettings.enthusiasm > 70) {
-      rewritten = rewritten.replace(/\./g, '!').replace(/!!/g, '!');
-    }
-    
-    // Premium-only style improvements
-    if (samples.some(s => s.content.includes('I think') || s.content.includes('I believe'))) {
-      rewritten = rewritten.replace(/It is/g, 'I think it is');
-    }
-
-    // Apply Premium-tier tone controls
-    if (toneSettings.confidence > 70) {
-      rewritten = rewritten.replace(/\bmight\b/gi, 'will');
-    }
-    
-    if (toneSettings.humor > 60) {
-      rewritten = rewritten.replace(/\binteresting\b/gi, 'amusing');
-    }
-    
-    if (toneSettings.urgency > 70) {
-      rewritten = rewritten.replace(/\bsoon\b/gi, 'immediately');
-    }
-    
-    if (toneSettings.clarity > 70) {
-      rewritten = rewritten.replace(/\bcomplex\b/gi, 'straightforward');
-    }
-  }
+  // Calculate dynamic confidence based on transformations applied
+  confidence = calculateDynamicConfidence(originalText, rewritten, transformationContext, analysisLevel, processingPriority);
 
   return {
     original: originalText,
     rewritten: rewritten,
-    confidence: Math.min(100, confidence + Math.random() * 20),
+    confidence: Math.min(100, confidence),
     styleTags,
     timestamp: new Date()
   };
+};
+
+// Create transformation context from samples and settings
+const createTransformationContext = (samples: WritingSample[], toneSettings: ToneSettings, styleTags: string[]) => {
+  const allText = samples.map(s => s.content).join(' ').toLowerCase();
+  
+  return {
+    // Vocabulary preferences from samples
+    prefersFormalWords: allText.includes('however') || allText.includes('furthermore'),
+    prefersCasualWords: allText.includes('gonna') || allText.includes('kinda'),
+    usesContractions: allText.includes("don't") || allText.includes("can't"),
+    usesFirstPerson: allText.includes('i ') || allText.includes('my '),
+    
+    // Sentence structure patterns
+    avgSentenceLength: calculateAvgSentenceLength(allText),
+    usesQuestions: allText.includes('?'),
+    usesExclamations: allText.includes('!'),
+    
+    // Tone preferences
+    formality: toneSettings.formality,
+    casualness: toneSettings.casualness,
+    enthusiasm: toneSettings.enthusiasm,
+    technicality: toneSettings.technicality,
+    creativity: toneSettings.creativity,
+    empathy: toneSettings.empathy,
+    confidence: toneSettings.confidence,
+    humor: toneSettings.humor,
+    urgency: toneSettings.urgency,
+    clarity: toneSettings.clarity,
+    
+    // Style tags
+    styleTags
+  };
+};
+
+// Calculate average sentence length from text
+const calculateAvgSentenceLength = (text: string): number => {
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const totalWords = text.split(/\s+/).length;
+  return sentences.length > 0 ? totalWords / sentences.length : 10;
+};
+
+// Apply comprehensive transformations based on context
+const applyAdvancedTransformations = (text: string, context: any, analysisLevel: string): string => {
+  let transformed = text;
+  
+  // 1. Formality transformations
+  if (context.formality > 60) {
+    transformed = applyFormalTransformations(transformed);
+  } else if (context.formality < 40) {
+    transformed = applyCasualTransformations(transformed);
+  }
+  
+  // 2. Enthusiasm transformations
+  if (context.enthusiasm > 70) {
+    transformed = applyEnthusiasticTransformations(transformed);
+  } else if (context.enthusiasm < 30) {
+    transformed = applyReservedTransformations(transformed);
+  }
+  
+  // 3. Confidence transformations
+  if (context.confidence > 70) {
+    transformed = applyConfidentTransformations(transformed);
+  } else if (context.confidence < 30) {
+    transformed = applyTentativeTransformations(transformed);
+  }
+  
+  // 4. Clarity transformations
+  if (context.clarity > 70) {
+    transformed = applyClarityTransformations(transformed);
+  }
+  
+  // 5. Creativity transformations (Pro/Premium)
+  if (analysisLevel !== 'basic' && context.creativity > 60) {
+    transformed = applyCreativeTransformations(transformed);
+  }
+  
+  // 6. Empathy transformations (Pro/Premium)
+  if (analysisLevel !== 'basic' && context.empathy > 60) {
+    transformed = applyEmpathyTransformations(transformed);
+  }
+  
+  // 7. Humor transformations (Premium only)
+  if (analysisLevel === 'extended' && context.humor > 60) {
+    transformed = applyHumorTransformations(transformed);
+  }
+  
+  // 8. Urgency transformations (Premium only)
+  if (analysisLevel === 'extended' && context.urgency > 70) {
+    transformed = applyUrgencyTransformations(transformed);
+  }
+  
+  // 9. Technical transformations
+  if (context.technicality > 60) {
+    transformed = applyTechnicalTransformations(transformed);
+  } else if (context.technicality < 40) {
+    transformed = applySimpleTransformations(transformed);
+  }
+  
+  // 10. Style-based transformations
+  if (context.styleTags.includes('conversational')) {
+    transformed = applyConversationalTransformations(transformed);
+  }
+  
+  if (context.styleTags.includes('professional')) {
+    transformed = applyProfessionalTransformations(transformed);
+  }
+  
+  return transformed;
+};
+
+// Formal transformations
+const applyFormalTransformations = (text: string): string => {
+  return text
+    .replace(/\bbut\b/gi, 'however')
+    .replace(/\bso\b/gi, 'therefore')
+    .replace(/\balso\b/gi, 'furthermore')
+    .replace(/\bcan't\b/gi, 'cannot')
+    .replace(/\bdon't\b/gi, 'do not')
+    .replace(/\bwon't\b/gi, 'will not')
+    .replace(/\bit's\b/gi, 'it is')
+    .replace(/\bthat's\b/gi, 'that is')
+    .replace(/\bI think\b/gi, 'I believe')
+    .replace(/\bkind of\b/gi, 'somewhat')
+    .replace(/\ba lot of\b/gi, 'numerous')
+    .replace(/\bget\b/gi, 'obtain')
+    .replace(/\bshow\b/gi, 'demonstrate');
+};
+
+// Casual transformations
+const applyCasualTransformations = (text: string): string => {
+  return text
+    .replace(/\bhowever\b/gi, 'but')
+    .replace(/\btherefore\b/gi, 'so')
+    .replace(/\bfurthermore\b/gi, 'also')
+    .replace(/\bcannot\b/gi, "can't")
+    .replace(/\bdo not\b/gi, "don't")
+    .replace(/\bwill not\b/gi, "won't")
+    .replace(/\bit is\b/gi, "it's")
+    .replace(/\bthat is\b/gi, "that's")
+    .replace(/\bI believe\b/gi, 'I think')
+    .replace(/\bsomewhat\b/gi, 'kind of')
+    .replace(/\bnumerous\b/gi, 'a lot of')
+    .replace(/\bobtain\b/gi, 'get')
+    .replace(/\bdemonstrate\b/gi, 'show');
+};
+
+// Enthusiastic transformations
+const applyEnthusiasticTransformations = (text: string): string => {
+  return text
+    .replace(/\bgood\b/gi, 'amazing')
+    .replace(/\bnice\b/gi, 'fantastic')
+    .replace(/\bokay\b/gi, 'great')
+    .replace(/\bfine\b/gi, 'excellent')
+    .replace(/\binteresting\b/gi, 'fascinating')
+    .replace(/\./g, '!')
+    .replace(/!!/g, '!')
+    .replace(/\bI like\b/gi, 'I love')
+    .replace(/\bpretty good\b/gi, 'absolutely wonderful');
+};
+
+// Reserved transformations
+const applyReservedTransformations = (text: string): string => {
+  return text
+    .replace(/!/g, '.')
+    .replace(/\bamazing\b/gi, 'adequate')
+    .replace(/\bfantastic\b/gi, 'satisfactory')
+    .replace(/\bexcellent\b/gi, 'acceptable')
+    .replace(/\blove\b/gi, 'appreciate')
+    .replace(/\bincredible\b/gi, 'notable');
+};
+
+// Confident transformations
+const applyConfidentTransformations = (text: string): string => {
+  return text
+    .replace(/\bI think\b/gi, 'I know')
+    .replace(/\bmight\b/gi, 'will')
+    .replace(/\bcould\b/gi, 'can')
+    .replace(/\bprobably\b/gi, 'definitely')
+    .replace(/\bmaybe\b/gi, 'certainly')
+    .replace(/\bperhaps\b/gi, 'undoubtedly')
+    .replace(/\bI believe\b/gi, 'I am confident that')
+    .replace(/\bseems like\b/gi, 'is clearly');
+};
+
+// Tentative transformations
+const applyTentativeTransformations = (text: string): string => {
+  return text
+    .replace(/\bwill\b/gi, 'might')
+    .replace(/\bcan\b/gi, 'could')
+    .replace(/\bdefinitely\b/gi, 'probably')
+    .replace(/\bcertainly\b/gi, 'perhaps')
+    .replace(/\bis\b/gi, 'seems to be')
+    .replace(/\bI know\b/gi, 'I think');
+};
+
+// Clarity transformations
+const applyClarityTransformations = (text: string): string => {
+  return text
+    .replace(/\bcomplex\b/gi, 'straightforward')
+    .replace(/\bcomplicated\b/gi, 'simple')
+    .replace(/\bdifficult\b/gi, 'clear')
+    .replace(/\bconfusing\b/gi, 'easy to understand')
+    .replace(/\bin other words\b/gi, 'simply put')
+    .replace(/\bthat is to say\b/gi, 'in simple terms');
+};
+
+// Creative transformations
+const applyCreativeTransformations = (text: string): string => {
+  return text
+    .replace(/\bgood\b/gi, 'innovative')
+    .replace(/\bnew\b/gi, 'groundbreaking')
+    .replace(/\bdifferent\b/gi, 'unique')
+    .replace(/\bchange\b/gi, 'transform')
+    .replace(/\bimprove\b/gi, 'revolutionize')
+    .replace(/\bway\b/gi, 'approach')
+    .replace(/\bmethod\b/gi, 'creative solution');
+};
+
+// Empathy transformations
+const applyEmpathyTransformations = (text: string): string => {
+  return text
+    .replace(/\bI think\b/gi, 'I understand that')
+    .replace(/\byou should\b/gi, 'you might consider')
+    .replace(/\byou need to\b/gi, 'it would be helpful if you')
+    .replace(/\bthe problem is\b/gi, 'I can see how challenging it is that')
+    .replace(/\byou have to\b/gi, 'I appreciate that you need to')
+    .replace(/\bit's wrong\b/gi, 'I can understand your concern about');
+};
+
+// Humor transformations (light touches)
+const applyHumorTransformations = (text: string): string => {
+  return text
+    .replace(/\binteresting\b/gi, 'amusing')
+    .replace(/\bstrange\b/gi, 'quirky')
+    .replace(/\bweird\b/gi, 'delightfully odd')
+    .replace(/\bserious\b/gi, 'no-nonsense (well, mostly)')
+    .replace(/\bobviously\b/gi, 'as clear as mud... just kidding, obviously');
+};
+
+// Urgency transformations
+const applyUrgencyTransformations = (text: string): string => {
+  return text
+    .replace(/\bsoon\b/gi, 'immediately')
+    .replace(/\blater\b/gi, 'right away')
+    .replace(/\beventually\b/gi, 'urgently')
+    .replace(/\bwhen you can\b/gi, 'as soon as possible')
+    .replace(/\bif you have time\b/gi, 'this requires immediate attention')
+    .replace(/\bplease consider\b/gi, 'please prioritize');
+};
+
+// Technical transformations
+const applyTechnicalTransformations = (text: string): string => {
+  return text
+    .replace(/\bway\b/gi, 'methodology')
+    .replace(/\bmethod\b/gi, 'systematic approach')
+    .replace(/\bprocess\b/gi, 'procedural framework')
+    .replace(/\bsystem\b/gi, 'infrastructure')
+    .replace(/\bsetup\b/gi, 'configuration')
+    .replace(/\bfix\b/gi, 'optimize')
+    .replace(/\bproblem\b/gi, 'technical challenge');
+};
+
+// Simple transformations
+const applySimpleTransformations = (text: string): string => {
+  return text
+    .replace(/\bmethodology\b/gi, 'way')
+    .replace(/\bsystematic approach\b/gi, 'method')
+    .replace(/\bprocedural framework\b/gi, 'process')
+    .replace(/\binfrastructure\b/gi, 'system')
+    .replace(/\bconfiguration\b/gi, 'setup')
+    .replace(/\boptimize\b/gi, 'fix')
+    .replace(/\btechnical challenge\b/gi, 'problem');
+};
+
+// Conversational transformations
+const applyConversationalTransformations = (text: string): string => {
+  return text
+    .replace(/\bIn conclusion\b/gi, 'So basically')
+    .replace(/\bTo summarize\b/gi, 'Long story short')
+    .replace(/\bIt is important to note\b/gi, 'By the way')
+    .replace(/\bOne must consider\b/gi, 'You should think about')
+    .replace(/\bIt should be mentioned\b/gi, 'Oh, and');
+};
+
+// Professional transformations
+const applyProfessionalTransformations = (text: string): string => {
+  return text
+    .replace(/\bSo basically\b/gi, 'In summary')
+    .replace(/\bLong story short\b/gi, 'To conclude')
+    .replace(/\bBy the way\b/gi, 'Additionally')
+    .replace(/\bYou should think about\b/gi, 'It is advisable to consider')
+    .replace(/\bOh, and\b/gi, 'Furthermore');
+};
+
+// Calculate dynamic confidence based on transformations
+const calculateDynamicConfidence = (
+  original: string, 
+  rewritten: string, 
+  context: any,
+  analysisLevel: string,
+  processingPriority: number
+): number => {
+  let confidence = 60; // Base confidence
+  
+  // Factor in analysis level
+  if (analysisLevel === 'extended') confidence += 20;
+  else if (analysisLevel === 'advanced') confidence += 10;
+  
+  // Factor in processing priority
+  if (processingPriority === 1) confidence += 15; // Premium
+  else if (processingPriority === 2) confidence += 8; // Pro
+  
+  // Factor in text transformation amount
+  const originalWords = original.split(' ').length;
+  const rewrittenWords = rewritten.split(' ').length;
+  const lengthSimilarity = 1 - Math.abs(originalWords - rewrittenWords) / Math.max(originalWords, rewrittenWords);
+  confidence += lengthSimilarity * 10;
+  
+  // Factor in style tag quality
+  const styleTagBonus = Math.min(context.styleTags.length * 3, 15);
+  confidence += styleTagBonus;
+  
+  // Add some realistic variance
+  const variance = (Math.random() - 0.5) * 20; // ±10 points
+  confidence += variance;
+  
+  return Math.max(65, Math.min(95, confidence)); // Keep within realistic bounds
 };
 
 // Secure style analysis with subscription validation
