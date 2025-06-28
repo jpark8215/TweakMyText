@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Send, Loader2, Sliders, Copy, Download, RefreshCw, ArrowLeft, Zap, AlertCircle, Calendar, Clock, Crown, Star, CheckCircle, History } from 'lucide-react';
 import { WritingSample, RewriteResult, ToneSettings } from '../types';
 import { secureRewriteText, analyzeToneFromSamples } from '../utils/secureStyleAnalyzer';
 import { validateToneAccess, validatePresetAccess, getSubscriptionLimits } from '../utils/subscriptionValidator';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { createExportService } from '../services/exportService';
 import ToneControls from './ToneControls';
 import ComparisonView from './ComparisonView';
 import RewriteHistoryStats from './RewriteHistoryStats';
 import RewriteHistoryModal from './RewriteHistoryModal';
+import { secureLog, handleError } from '../utils/errorHandler';
 
 interface TextRewriterProps {
   samples: WritingSample[];
@@ -41,6 +43,9 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
 
   const { user, updateTokens, updateExports, saveRewriteHistory } = useAuth();
 
+  // Create export service instance
+  const exportService = useMemo(() => createExportService(updateExports), [updateExports]);
+
   // Analyze samples and set initial tone settings when component mounts or samples change
   useEffect(() => {
     if (samples.length > 0) {
@@ -48,13 +53,14 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         const analyzedTone = analyzeToneFromSamples(samples, user);
         setToneSettings(analyzedTone);
       } catch (error) {
-        console.warn('Tone analysis limited by subscription tier:', error);
+        const appError = handleError(error, 'tone_analysis');
+        secureLog('Tone analysis limited by subscription tier:', { error: appError.message });
         // Keep default settings for free users
       }
     }
   }, [samples, user]);
 
-  const limits = getSubscriptionLimits(user);
+  const limits = useMemo(() => getSubscriptionLimits(user), [user?.subscription_tier]);
 
   const formatTokens = (tokens: number) => {
     if (tokens >= 1000000) {
@@ -131,7 +137,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         });
 
         if (saveError) {
-          console.error('Failed to save rewrite history:', saveError);
+          secureLog('Failed to save rewrite history:', { error: saveError.message });
           setRewriteSaveStatus('error');
           
           // Show user-friendly error message based on subscription tier
@@ -141,7 +147,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
             alert('Warning: Your rewrite was completed but there was an issue saving it to your history. Your result is still available for export.');
           }
         } else {
-          console.log('Rewrite history saved successfully');
+          secureLog('Rewrite history saved successfully');
           setRewriteSaveStatus('saved');
           
           // Trigger stats refresh
@@ -155,9 +161,10 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
       }
 
     } catch (error: any) {
-      console.error('Rewrite failed:', error);
-      if (error.message.includes('subscription') || error.message.includes('requires')) {
-        setSecurityError(error.message);
+      const appError = handleError(error, 'rewrite_text');
+      secureLog('Rewrite failed:', { error: appError.message });
+      if (appError.message.includes('subscription') || appError.message.includes('requires')) {
+        setSecurityError(appError.message);
       } else {
         alert('Rewrite failed. Please try again.');
       }
@@ -175,8 +182,9 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
       setToneSettings(newSettings);
       setSecurityError(null);
     } catch (error: any) {
-      setSecurityError(error.message);
-      console.warn('Tone modification blocked:', error.message);
+      const appError = handleError(error, 'tone_settings_change');
+      setSecurityError(appError.message);
+      secureLog('Tone modification blocked:', { error: appError.message });
     }
   };
 
@@ -187,31 +195,13 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
   const handleExport = async () => {
     if (!result || !user) return;
     
-    console.log('Export attempt:', {
+    secureLog('Export attempt from TextRewriter:', {
       userTier: user.subscription_tier,
       currentExports: user.monthly_exports_used,
       hasResult: !!result
     });
     
     try {
-      // Check export limits for all tiers (including premium for logging)
-      if (user.subscription_tier === 'free') {
-        const monthlyExportsUsed = user.monthly_exports_used || 0;
-        console.log('Free tier export check:', { monthlyExportsUsed, limit: 5 });
-        if (monthlyExportsUsed >= 5) {
-          alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for more exports.');
-          return;
-        }
-      } else if (user.subscription_tier === 'pro') {
-        const monthlyExportsUsed = user.monthly_exports_used || 0;
-        console.log('Pro tier export check:', { monthlyExportsUsed, limit: 200 });
-        if (monthlyExportsUsed >= 200) {
-          alert('You have reached your monthly export limit of 200. Upgrade to Premium for unlimited exports.');
-          return;
-        }
-      }
-      // Premium users have unlimited exports, no check needed
-      
       const exportData = {
         original: result.original,
         rewritten: result.rewritten,
@@ -226,27 +216,16 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
         rewriteSaved: rewriteSaveStatus === 'saved',
       };
       
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `rewrite-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      console.log('Export file created, now updating export count...');
-
-      // Update export count for all tiers (Premium will be handled in updateExports)
-      const { error } = await updateExports(1);
-      if (error) {
-        console.error('Failed to update export count:', error);
-        // Don't show error to user since export was successful
-      } else {
-        console.log('Export count updated successfully');
-      }
+      const filename = `rewrite-${new Date().toISOString().split('T')[0]}.json`;
+      
+      // Use centralized export service
+      await exportService.exportData(exportData, filename, user);
+      
+      secureLog('Export completed successfully from TextRewriter');
     } catch (error) {
-      console.error('Export failed:', error);
-      alert('Export failed. Please try again.');
+      const appError = handleError(error, 'export_rewrite');
+      secureLog('Export failed:', { error: appError.message });
+      alert(appError.message);
     }
   };
 

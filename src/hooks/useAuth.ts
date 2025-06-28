@@ -1,43 +1,56 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { User } from '../types';
 import { logSecurityEvent } from '../utils/securityLogger';
+import { secureLog, AppError, handleError } from '../utils/errorHandler';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
+  const authSubscriptionRef = useRef<any>(null);
+
+  // Cleanup function to prevent memory leaks
+  const cleanup = useCallback(() => {
+    mountedRef.current = false;
+    if (authSubscriptionRef.current) {
+      authSubscriptionRef.current.unsubscribe();
+      authSubscriptionRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
 
     // Get initial session with better error handling
     const initializeAuth = async () => {
       try {
-        console.log('Initializing authentication...');
+        secureLog('Initializing authentication...');
         
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Session initialization error:', error);
-          if (mounted) {
+          secureLog('Session initialization error:', { error: error.message });
+          if (mountedRef.current) {
             setLoading(false);
           }
           return;
         }
         
-        if (session?.user && mounted) {
-          console.log('Found existing session for user:', session.user.id);
+        if (session?.user && mountedRef.current) {
+          secureLog('Found existing session for user');
           await fetchUserProfile(session.user);
         } else {
-          console.log('No existing session found');
-          if (mounted) {
+          secureLog('No existing session found');
+          if (mountedRef.current) {
             setLoading(false);
           }
         }
       } catch (error) {
-        console.error('Auth initialization failed:', error);
-        if (mounted) {
+        const appError = handleError(error, 'auth_initialization');
+        secureLog('Auth initialization failed:', { error: appError.message });
+        if (mountedRef.current) {
           setLoading(false);
         }
       }
@@ -48,9 +61,9 @@ export const useAuth = () => {
     // Listen for auth changes with improved error handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
 
-        console.log('Auth state change:', event, session?.user?.id);
+        secureLog('Auth state change:', { event });
         
         try {
           if (session?.user) {
@@ -77,14 +90,15 @@ export const useAuth = () => {
               });
             }
             
-            if (mounted) {
+            if (mountedRef.current) {
               setUser(null);
               setLoading(false);
             }
           }
         } catch (error) {
-          console.error('Auth state change error:', error);
-          if (mounted) {
+          const appError = handleError(error, 'auth_state_change');
+          secureLog('Auth state change error:', { error: appError.message });
+          if (mountedRef.current) {
             setUser(null);
             setLoading(false);
           }
@@ -92,22 +106,40 @@ export const useAuth = () => {
       }
     );
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    authSubscriptionRef.current = subscription;
+
+    return cleanup;
   }, []); // Remove user dependency to prevent infinite loops
 
-  const fetchUserProfile = async (authUser: SupabaseUser) => {
+  // Helper function to get expected token amounts for each tier
+  const getExpectedTokensForTier = useCallback((tier: string): { daily: number | null, monthly: number } => {
+    const tierLimits = {
+      free: { daily: 100000, monthly: 1000000 },
+      pro: { daily: null, monthly: 5000000 },
+      premium: { daily: null, monthly: 10000000 }
+    } as const;
+    
+    const limits = tierLimits[tier as keyof typeof tierLimits];
+    if (!limits) {
+      secureLog('Invalid subscription tier:', { tier });
+      return tierLimits.free; // Safe fallback
+    }
+    
+    return limits;
+  }, []);
+
+  const fetchUserProfile = useCallback(async (authUser: SupabaseUser) => {
+    if (!mountedRef.current) return;
+    
     try {
-      console.log('Fetching user profile for:', authUser.id);
+      secureLog('Fetching user profile');
       
       // Reset daily/monthly tokens if needed (with error handling)
       try {
         await supabase.rpc('reset_daily_tokens');
         await supabase.rpc('reset_monthly_tokens');
       } catch (rpcError) {
-        console.warn('Token reset functions not available:', rpcError);
+        secureLog('Token reset functions not available:', { error: rpcError });
         // Don't fail the entire auth process if token reset fails
       }
 
@@ -118,7 +150,7 @@ export const useAuth = () => {
         .single();
 
       if (error && error.code === 'PGRST116') {
-        console.log('User profile not found, creating new one...');
+        secureLog('User profile not found, creating new one...');
         // User doesn't exist, create new profile with correct free tier limits
         const newUser = {
           id: authUser.id,
@@ -140,8 +172,7 @@ export const useAuth = () => {
           .single();
 
         if (createError) {
-          console.error('Failed to create user profile:', createError);
-          throw createError;
+          throw new AppError('Failed to create user profile', 'USER_CREATION_FAILED', 'critical');
         }
         
         const userProfile = {
@@ -155,8 +186,10 @@ export const useAuth = () => {
             : undefined,
         };
         
-        setUser(userProfile);
-        console.log('User profile created successfully:', userProfile);
+        if (mountedRef.current) {
+          setUser(userProfile);
+        }
+        secureLog('User profile created successfully');
 
         // Log new user creation
         await logSecurityEvent({
@@ -167,8 +200,7 @@ export const useAuth = () => {
           subscriptionTier: userProfile.subscription_tier,
         });
       } else if (error) {
-        console.error('Database error fetching user profile:', error);
-        throw error;
+        throw new AppError(`Database error: ${error.message}`, 'DATABASE_ERROR', 'high');
       } else {
         // Validate and fix token amounts based on subscription tier
         let correctedData = { ...data };
@@ -177,7 +209,11 @@ export const useAuth = () => {
         // Check if tokens_remaining is correct for the subscription tier
         const expectedTokens = getExpectedTokensForTier(data.subscription_tier);
         if (data.tokens_remaining > expectedTokens.monthly) {
-          console.log(`Correcting tokens for ${data.subscription_tier} user: ${data.tokens_remaining} -> ${expectedTokens.daily || expectedTokens.monthly}`);
+          secureLog('Correcting tokens for user:', { 
+            tier: data.subscription_tier,
+            current: data.tokens_remaining,
+            expected: expectedTokens.daily || expectedTokens.monthly
+          });
           correctedData.tokens_remaining = expectedTokens.daily || expectedTokens.monthly;
           needsUpdate = true;
         }
@@ -192,9 +228,9 @@ export const useAuth = () => {
             .eq('id', authUser.id);
 
           if (updateError) {
-            console.error('Failed to update corrected user data:', updateError);
+            secureLog('Failed to update corrected user data:', { error: updateError.message });
           } else {
-            console.log('User token amounts corrected in database');
+            secureLog('User token amounts corrected in database');
           }
         }
 
@@ -209,11 +245,14 @@ export const useAuth = () => {
             : undefined,
         };
         
-        setUser(userProfile);
-        console.log('User profile loaded successfully:', userProfile);
+        if (mountedRef.current) {
+          setUser(userProfile);
+        }
+        secureLog('User profile loaded successfully');
       }
     } catch (error) {
-      console.error('Error in fetchUserProfile:', error);
+      const appError = handleError(error, 'fetch_user_profile');
+      secureLog('Error in fetchUserProfile:', { error: appError.message });
       
       // Log profile fetch error
       await logSecurityEvent({
@@ -222,30 +261,18 @@ export const useAuth = () => {
         resource: 'user_management',
         allowed: false,
         subscriptionTier: 'unknown',
-        errorMessage: `Profile fetch failed: ${error}`,
+        errorMessage: `Profile fetch failed: ${appError.message}`,
       });
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [getExpectedTokensForTier]);
 
-  // Helper function to get expected token amounts for each tier
-  const getExpectedTokensForTier = (tier: string) => {
-    switch (tier) {
-      case 'free':
-        return { daily: 100000, monthly: 1000000 }; // 100K daily, 1M monthly
-      case 'pro':
-        return { daily: null, monthly: 5000000 }; // No daily limit, 5M monthly
-      case 'premium':
-        return { daily: null, monthly: 10000000 }; // No daily limit, 10M monthly
-      default:
-        return { daily: 100000, monthly: 1000000 }; // Default to free tier
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
-      console.log('Attempting sign in for:', email);
+      secureLog('Attempting sign in');
       
       // Clear any existing session first
       await supabase.auth.signOut();
@@ -255,15 +282,12 @@ export const useAuth = () => {
         password,
       });
       
-      console.log('Sign in response:', { 
+      secureLog('Sign in response:', { 
         success: !error, 
-        error: error?.message,
-        user: data?.user?.id 
+        hasUser: !!data?.user
       });
       
       if (error) {
-        console.error('Sign in error:', error);
-        
         // Enhanced error handling
         let userFriendlyMessage = error.message;
         
@@ -297,18 +321,19 @@ export const useAuth = () => {
       
       return { error: null };
     } catch (error: any) {
-      console.error('Sign in exception:', error);
+      const appError = handleError(error, 'sign_in');
+      secureLog('Sign in exception:', { error: appError.message });
       return { 
         error: { 
           message: 'Network error. Please check your connection and try again.' 
         } 
       };
     }
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     try {
-      console.log('Attempting sign up for:', email);
+      secureLog('Attempting sign up');
       
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
@@ -318,15 +343,12 @@ export const useAuth = () => {
         }
       });
       
-      console.log('Sign up response:', { 
+      secureLog('Sign up response:', { 
         success: !error, 
-        error: error?.message,
-        user: data?.user?.id 
+        hasUser: !!data?.user
       });
       
       if (error) {
-        console.error('Sign up error:', error);
-        
         // Enhanced error handling
         let userFriendlyMessage = error.message;
         
@@ -357,18 +379,19 @@ export const useAuth = () => {
       
       return { error: null };
     } catch (error: any) {
-      console.error('Sign up exception:', error);
+      const appError = handleError(error, 'sign_up');
+      secureLog('Sign up exception:', { error: appError.message });
       return { 
         error: { 
           message: 'Network error. Please check your connection and try again.' 
         } 
       };
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
-      console.log('Starting sign out process...');
+      secureLog('Starting sign out process...');
       
       // Log sign out attempt before clearing user state
       if (user) {
@@ -382,34 +405,39 @@ export const useAuth = () => {
       }
 
       // Clear user state immediately to prevent UI issues
-      setUser(null);
-      setLoading(false);
+      if (mountedRef.current) {
+        setUser(null);
+        setLoading(false);
+      }
 
       // Then perform the actual sign out
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('Sign out error:', error);
+        secureLog('Sign out error:', { error: error.message });
         // If sign out fails, we still want to clear local state
         // The user will be redirected to sign in anyway
         return { error: null }; // Don't return the error to prevent UI issues
       }
 
-      console.log('Sign out completed successfully');
+      secureLog('Sign out completed successfully');
       return { error: null };
     } catch (error: any) {
-      console.error('Sign out exception:', error);
+      const appError = handleError(error, 'sign_out');
+      secureLog('Sign out exception:', { error: appError.message });
       // Even if there's an error, clear the local state
-      setUser(null);
-      setLoading(false);
+      if (mountedRef.current) {
+        setUser(null);
+        setLoading(false);
+      }
       return { error: null }; // Don't return the error to prevent UI issues
     }
-  };
+  }, [user]);
 
-  const updateTokens = async (tokensUsed: number) => {
+  const updateTokens = useCallback(async (tokensUsed: number) => {
     if (!user) return { error: new Error('No user found') };
 
-    console.log('Updating tokens:', { tokensUsed, currentTokens: user.tokens_remaining });
+    secureLog('Updating tokens:', { tokensUsed, currentTokens: user.tokens_remaining });
 
     // Log token usage attempt
     await logSecurityEvent({
@@ -452,14 +480,16 @@ export const useAuth = () => {
             })
             .eq('id', user.id);
           
-          setUser({ 
-            ...user, 
-            tokens_remaining: maxDailyTokens,
-            daily_tokens_used: 0,
-            last_token_reset: today
-          });
+          if (mountedRef.current) {
+            setUser({ 
+              ...user, 
+              tokens_remaining: maxDailyTokens,
+              daily_tokens_used: 0,
+              last_token_reset: today
+            });
+          }
         } catch (error) {
-          console.error('Failed to reset daily tokens:', error);
+          secureLog('Failed to reset daily tokens:', { error });
         }
       }
 
@@ -476,15 +506,17 @@ export const useAuth = () => {
             })
             .eq('id', user.id);
           
-          setUser({ 
-            ...user, 
-            monthly_tokens_used: 0,
-            monthly_exports_used: 0,
-            tokens_remaining: 100000,
-            daily_tokens_used: 0
-          });
+          if (mountedRef.current) {
+            setUser({ 
+              ...user, 
+              monthly_tokens_used: 0,
+              monthly_exports_used: 0,
+              tokens_remaining: 100000,
+              daily_tokens_used: 0
+            });
+          }
         } catch (error) {
-          console.error('Failed to reset monthly tokens:', error);
+          secureLog('Failed to reset monthly tokens:', { error });
         }
       }
 
@@ -542,7 +574,7 @@ export const useAuth = () => {
         })
         .eq('id', user.id);
 
-      if (!error) {
+      if (!error && mountedRef.current) {
         setUser({ 
           ...user, 
           tokens_remaining: newTokens,
@@ -558,8 +590,8 @@ export const useAuth = () => {
           allowed: true,
           subscriptionTier: user.subscription_tier,
         });
-      } else {
-        console.error('Token update error:', error);
+      } else if (error) {
+        secureLog('Token update error:', { error: error.message });
         // Log token update error
         await logSecurityEvent({
           userId: user.id,
@@ -573,15 +605,16 @@ export const useAuth = () => {
 
       return { error };
     } catch (error: any) {
-      console.error('Token update exception:', error);
-      return { error };
+      const appError = handleError(error, 'token_update');
+      secureLog('Token update exception:', { error: appError.message });
+      return { error: appError };
     }
-  };
+  }, [user]);
 
-  const updateExports = async (exportsUsed: number) => {
+  const updateExports = useCallback(async (exportsUsed: number) => {
     if (!user) return { error: new Error('No user found') };
 
-    console.log('Updating exports:', { 
+    secureLog('Updating exports:', { 
       exportsUsed, 
       currentExports: user.monthly_exports_used,
       subscriptionTier: user.subscription_tier 
@@ -612,7 +645,7 @@ export const useAuth = () => {
 
     // Check if unlimited exports (Premium)
     if (limits.monthlyLimit === -1) {
-      console.log('Premium user - unlimited exports, logging for analytics');
+      secureLog('Premium user - unlimited exports, logging for analytics');
       await logSecurityEvent({
         userId: user.id,
         action: 'export_unlimited',
@@ -626,7 +659,7 @@ export const useAuth = () => {
     const currentExportsUsed = user.monthly_exports_used || 0;
     const newExportsUsed = currentExportsUsed + exportsUsed;
     
-    console.log('Export limit check:', {
+    secureLog('Export limit check:', {
       currentExportsUsed,
       newExportsUsed,
       monthlyLimit: limits.monthlyLimit,
@@ -634,7 +667,7 @@ export const useAuth = () => {
     });
 
     if (newExportsUsed > limits.monthlyLimit) {
-      console.log('Export limit exceeded');
+      secureLog('Export limit exceeded');
       await logSecurityEvent({
         userId: user.id,
         action: 'export_limit_exceeded',
@@ -647,15 +680,15 @@ export const useAuth = () => {
     }
 
     try {
-      console.log('Updating database with new export count:', newExportsUsed);
+      secureLog('Updating database with new export count:', newExportsUsed);
       
       const { error } = await supabase
         .from('users')
         .update({ monthly_exports_used: newExportsUsed })
         .eq('id', user.id);
 
-      if (!error) {
-        console.log('Export count updated successfully in database');
+      if (!error && mountedRef.current) {
+        secureLog('Export count updated successfully in database');
         
         // Update local user state
         setUser({ ...user, monthly_exports_used: newExportsUsed });
@@ -669,9 +702,9 @@ export const useAuth = () => {
           subscriptionTier: user.subscription_tier,
         });
         
-        console.log('Local user state updated with new export count');
-      } else {
-        console.error('Export update error:', error);
+        secureLog('Local user state updated with new export count');
+      } else if (error) {
+        secureLog('Export update error:', { error: error.message });
         // Log export error
         await logSecurityEvent({
           userId: user.id,
@@ -685,21 +718,22 @@ export const useAuth = () => {
 
       return { error };
     } catch (error: any) {
-      console.error('Export update exception:', error);
+      const appError = handleError(error, 'export_update');
+      secureLog('Export update exception:', { error: appError.message });
       await logSecurityEvent({
         userId: user.id,
         action: 'export_exception',
         resource: 'exports',
         allowed: false,
         subscriptionTier: user.subscription_tier,
-        errorMessage: `Exception during export update: ${error.message}`,
+        errorMessage: `Exception during export update: ${appError.message}`,
       });
-      return { error };
+      return { error: appError };
     }
-  };
+  }, [user]);
 
   // Enhanced rewrite history saving
-  const saveRewriteHistory = async (rewriteData: {
+  const saveRewriteHistory = useCallback(async (rewriteData: {
     original_text: string;
     rewritten_text: string;
     confidence: number;
@@ -708,7 +742,7 @@ export const useAuth = () => {
     if (!user) return { error: new Error('No user found') };
 
     try {
-      console.log('Saving rewrite history for user:', user.id);
+      secureLog('Saving rewrite history for user');
       
       const { data, error } = await supabase
         .from('rewrite_history')
@@ -723,7 +757,7 @@ export const useAuth = () => {
         .single();
 
       if (error) {
-        console.error('Failed to save rewrite history:', error);
+        secureLog('Failed to save rewrite history:', { error: error.message });
         
         // Log rewrite save error
         await logSecurityEvent({
@@ -738,7 +772,7 @@ export const useAuth = () => {
         return { error };
       }
 
-      console.log('Rewrite history saved successfully:', data.id);
+      secureLog('Rewrite history saved successfully');
       
       // Log successful rewrite save
       await logSecurityEvent({
@@ -751,10 +785,11 @@ export const useAuth = () => {
 
       return { error: null, data };
     } catch (error: any) {
-      console.error('Exception saving rewrite history:', error);
-      return { error };
+      const appError = handleError(error, 'save_rewrite_history');
+      secureLog('Exception saving rewrite history:', { error: appError.message });
+      return { error: appError };
     }
-  };
+  }, [user]);
 
   return {
     user,

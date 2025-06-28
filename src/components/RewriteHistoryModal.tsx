@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calendar, BarChart3, Download, Search, Filter, Star, Crown, AlertCircle, Clock, FileText } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { createExportService } from '../services/exportService';
+import { secureLog, handleError } from '../utils/errorHandler';
 
 interface RewriteHistoryItem {
   id: string;
@@ -26,8 +28,14 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
   const [sortBy, setSortBy] = useState<'date' | 'confidence'>('date');
   const [filterTag, setFilterTag] = useState<string>('');
   const [exportingId, setExportingId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const pageSize = 20;
 
   const { user, updateExports } = useAuth();
+
+  // Create export service instance
+  const exportService = useMemo(() => createExportService(updateExports), [updateExports]);
 
   useEffect(() => {
     if (isOpen && user) {
@@ -35,35 +43,53 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
     }
   }, [isOpen, user]);
 
-  const loadHistory = async () => {
+  const loadHistory = async (newPage = 0) => {
     if (!user) return;
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Implement pagination
+      const start = newPage * pageSize;
+      const end = start + pageSize - 1;
+      
+      const { data, error, count } = await supabase
         .from('rewrite_history')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(user.subscription_tier === 'premium' ? 1000 : 100); // Premium gets more history
+        .range(start, end);
 
       if (error) {
-        console.error('Error loading rewrite history:', error);
-        return;
+        throw error;
       }
 
-      setHistory(data || []);
+      if (newPage === 0) {
+        setHistory(data || []);
+      } else {
+        setHistory(prev => [...prev, ...(data || [])]);
+      }
+      
+      setPage(newPage);
+      setHasMore((data?.length || 0) === pageSize);
+      
     } catch (error) {
-      console.error('Exception loading rewrite history:', error);
+      const appError = handleError(error, 'load_history');
+      secureLog('Exception loading rewrite history:', { error: appError.message });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMoreHistory = () => {
+    if (hasMore && !loading) {
+      loadHistory(page + 1);
     }
   };
 
   const handleExportHistory = async () => {
     if (!user || history.length === 0) return;
 
-    console.log('Exporting full history:', {
+    secureLog('Exporting full history:', {
       userTier: user.subscription_tier,
       currentExports: user.monthly_exports_used,
       historyCount: history.length
@@ -111,34 +137,23 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
         }))
       };
 
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `rewrite-history-${user.subscription_tier}-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      console.log('History export file created, updating export count...');
-
-      // Update export count for all tiers (Premium will be handled in updateExports)
-      const { error } = await updateExports(1);
-      if (error) {
-        console.error('Failed to update export count:', error);
-        // Don't show error to user since export was successful
-      } else {
-        console.log('Export count updated successfully for history export');
-      }
+      const filename = `rewrite-history-${user.subscription_tier}-${new Date().toISOString().split('T')[0]}.json`;
+      
+      // Use centralized export service
+      await exportService.exportData(exportData, filename, user);
+      
+      secureLog('History export completed successfully');
     } catch (error) {
-      console.error('History export failed:', error);
-      alert('Export failed. Please try again.');
+      const appError = handleError(error, 'export_history');
+      secureLog('History export failed:', { error: appError.message });
+      alert(appError.message);
     }
   };
 
   const handleExportSingleItem = async (item: RewriteHistoryItem) => {
     if (!user) return;
 
-    console.log('Exporting single history item:', {
+    secureLog('Exporting single history item:', {
       userTier: user.subscription_tier,
       currentExports: user.monthly_exports_used,
       itemId: item.id
@@ -180,27 +195,16 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
         }
       };
 
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `rewrite-${item.id.substring(0, 8)}-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      console.log('Single item export file created, updating export count...');
-
-      // Update export count for all tiers
-      const { error } = await updateExports(1);
-      if (error) {
-        console.error('Failed to update export count:', error);
-        // Don't show error to user since export was successful
-      } else {
-        console.log('Export count updated successfully for single item export');
-      }
+      const filename = `rewrite-${item.id.substring(0, 8)}-${new Date().toISOString().split('T')[0]}.json`;
+      
+      // Use centralized export service
+      await exportService.exportData(exportData, filename, user);
+      
+      secureLog('Single item export completed successfully');
     } catch (error) {
-      console.error('Single item export failed:', error);
-      alert('Export failed. Please try again.');
+      const appError = handleError(error, 'export_single_item');
+      secureLog('Single item export failed:', { error: appError.message });
+      alert(appError.message);
     } finally {
       setExportingId(null);
     }
@@ -233,7 +237,7 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
     const olderHistory = history.slice(-10);
     
     const getAvgConfidence = (items: RewriteHistoryItem[]) => 
-      items.reduce((sum, item) => sum + item.confidence, 0) / items.length;
+      items.length > 0 ? items.reduce((sum, item) => sum + item.confidence, 0) / items.length : 0;
 
     return {
       recent_avg_confidence: getAvgConfidence(recentHistory),
@@ -448,7 +452,7 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
         <div className="flex-1 overflow-hidden flex">
           {/* History List */}
           <div className="w-1/2 border-r border-gray-200 overflow-y-auto">
-            {loading ? (
+            {loading && page === 0 ? (
               <div className="p-6 text-center">
                 <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                 <p className="text-gray-600">Loading history...</p>
@@ -521,6 +525,26 @@ export default function RewriteHistoryModal({ isOpen, onClose, onOpenPricing }: 
                     </div>
                   </div>
                 ))}
+                
+                {/* Load more button */}
+                {hasMore && (
+                  <div className="text-center py-4">
+                    <button
+                      onClick={loadMoreHistory}
+                      disabled={loading}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm transition-colors"
+                    >
+                      {loading ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                          Loading more...
+                        </div>
+                      ) : (
+                        'Load more'
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

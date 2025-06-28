@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { X, BarChart3, Crown, Sparkles, Star, Settings, Lock, Zap } from 'lucide-react';
 import { ToneSettings } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -11,11 +11,11 @@ interface ToneControlsProps {
   onOpenPricing?: () => void;
 }
 
-export default function ToneControls({ settings, onChange, onClose, onOpenPricing }: ToneControlsProps) {
+const ToneControls = memo(({ settings, onChange, onClose, onOpenPricing }: ToneControlsProps) => {
   const { user } = useAuth();
-  const limits = getSubscriptionLimits(user);
+  const limits = useMemo(() => getSubscriptionLimits(user), [user?.subscription_tier]);
 
-  const handleSliderChange = (key: keyof ToneSettings, value: number) => {
+  const handleSliderChange = useCallback((key: keyof ToneSettings, value: number) => {
     // Check if user has permission to modify tone settings
     if (!limits.canModifyTone) {
       return; // Free users cannot modify tone settings
@@ -30,9 +30,9 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
       ...settings,
       [key]: value
     });
-  };
+  }, [settings, onChange, limits]);
 
-  const resetToDefaults = () => {
+  const resetToDefaults = useCallback(() => {
     if (!limits.canModifyTone) {
       return; // Free users cannot reset tone settings
     }
@@ -57,28 +57,28 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
     });
     
     onChange(resetSettings);
-  };
+  }, [settings, onChange, limits]);
 
-  const handleUpgradeClick = () => {
+  const handleUpgradeClick = useCallback(() => {
     onOpenPricing?.();
-  };
+  }, [onOpenPricing]);
 
-  const presets = [
+  const presets = useMemo(() => [
     { name: 'Professional', values: { formality: 80, casualness: 20, enthusiasm: 40, technicality: 70, creativity: 30, empathy: 50 } },
     { name: 'Friendly', values: { formality: 30, casualness: 80, enthusiasm: 70, technicality: 30, creativity: 60, empathy: 80 } },
     { name: 'Academic', values: { formality: 90, casualness: 10, enthusiasm: 20, technicality: 90, creativity: 40, empathy: 30 } },
     { name: 'Casual', values: { formality: 20, casualness: 90, enthusiasm: 60, technicality: 20, creativity: 70, empathy: 70 } },
-  ];
+  ], []);
 
   // Premium-only advanced presets
-  const advancedPresets = [
+  const advancedPresets = useMemo(() => [
     { name: 'Executive', values: { formality: 95, casualness: 15, enthusiasm: 30, technicality: 60, creativity: 25, empathy: 40, confidence: 90, humor: 10, urgency: 70, clarity: 95 } },
     { name: 'Creative', values: { formality: 25, casualness: 75, enthusiasm: 85, technicality: 25, creativity: 95, empathy: 70, confidence: 70, humor: 80, urgency: 40, clarity: 60 } },
     { name: 'Technical', values: { formality: 70, casualness: 30, enthusiasm: 40, technicality: 95, creativity: 50, empathy: 30, confidence: 80, humor: 20, urgency: 60, clarity: 90 } },
     { name: 'Persuasive', values: { formality: 60, casualness: 50, enthusiasm: 80, technicality: 45, creativity: 70, empathy: 85, confidence: 90, humor: 60, urgency: 75, clarity: 85 } },
-  ];
+  ], []);
 
-  const applyPreset = (preset: typeof presets[0]) => {
+  const applyPreset = useCallback((preset: typeof presets[0]) => {
     if (!limits.canUsePresets) {
       return; // Only Pro/Premium users can apply presets
     }
@@ -92,9 +92,9 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
     });
     
     onChange(newSettings);
-  };
+  }, [settings, onChange, limits]);
 
-  const applyAdvancedPreset = (preset: typeof advancedPresets[0]) => {
+  const applyAdvancedPreset = useCallback((preset: typeof advancedPresets[0]) => {
     if (!limits.canUseAdvancedPresets) {
       return; // Only Premium users can apply advanced presets
     }
@@ -106,9 +106,9 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
     });
     
     onChange(newSettings);
-  };
+  }, [settings, onChange, limits]);
 
-  const allSliders = [
+  const allSliders = useMemo(() => [
     {
       key: 'formality' as keyof ToneSettings,
       label: 'Formality',
@@ -199,16 +199,18 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
       color: 'from-indigo-400 to-purple-500',
       tier: 'premium'
     }
-  ];
+  ], []);
 
   // Filter sliders based on user's subscription tier
-  const availableSliders = allSliders.filter(slider => 
-    limits.availableToneControls.includes(slider.key)
-  );
+  const availableSliders = useMemo(() => 
+    allSliders.filter(slider => 
+      limits.availableToneControls.includes(slider.key)
+    ), [allSliders, limits.availableToneControls]);
 
-  const lockedSliders = allSliders.filter(slider => 
-    !limits.availableToneControls.includes(slider.key)
-  );
+  const lockedSliders = useMemo(() => 
+    allSliders.filter(slider => 
+      !limits.availableToneControls.includes(slider.key)
+    ), [allSliders, limits.availableToneControls]);
 
   return (
     <div className="bg-white/80 backdrop-blur-xl rounded-lg sm:rounded-xl lg:rounded-2xl border border-gray-200 p-4 sm:p-6 lg:p-8 shadow-lg">
@@ -458,4 +460,8 @@ export default function ToneControls({ settings, onChange, onClose, onOpenPricin
       </div>
     </div>
   );
-}
+});
+
+ToneControls.displayName = 'ToneControls';
+
+export default ToneControls;

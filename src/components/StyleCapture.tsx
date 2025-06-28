@@ -3,6 +3,8 @@ import { Plus, X, FileText, Sparkles, ChevronRight, Zap, Trash2, Save, AlertCirc
 import { WritingSample } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { sanitizeTitle, sanitizeContent } from '../utils/inputSanitizer';
+import { secureLog, handleError } from '../utils/errorHandler';
 
 interface StyleCaptureProps {
   samples: WritingSample[];
@@ -65,7 +67,8 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
 
       onSamplesChange(loadedSamples);
     } catch (error) {
-      console.error('Error loading samples:', error);
+      const appError = handleError(error, 'load_samples');
+      secureLog('Error loading samples:', { error: appError.message });
       setError('Failed to load your writing samples. Please refresh the page.');
     } finally {
       setLoading(false);
@@ -87,11 +90,20 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
       return;
     }
 
+    // Sanitize input
+    const sanitizedTitle = sanitizeTitle(newSample.title);
+    const sanitizedContent = sanitizeContent(newSample.content);
+
+    if (!sanitizedTitle || !sanitizedContent) {
+      setError('Please provide valid title and content for your writing sample.');
+      return;
+    }
+
     const tempId = crypto.randomUUID();
     const sample: WritingSample = {
       id: tempId,
-      title: newSample.title,
-      content: newSample.content,
+      title: sanitizedTitle,
+      content: sanitizedContent,
       createdAt: new Date(),
       saved: false
     };
@@ -126,7 +138,8 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
         );
         onSamplesChange(finalSamples);
       } catch (error) {
-        console.error('Error saving sample:', error);
+        const appError = handleError(error, 'save_sample');
+        secureLog('Error saving sample:', { error: appError.message });
         setError('Failed to save sample to your account. It will be lost when you refresh.');
         
         // Mark as unsaved in local state
@@ -166,7 +179,8 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
       );
       onSamplesChange(updatedSamples);
     } catch (error) {
-      console.error('Error saving sample:', error);
+      const appError = handleError(error, 'save_sample_to_db');
+      secureLog('Error saving sample:', { error: appError.message });
       setError('Failed to save sample. Please try again.');
     } finally {
       setSavingId(null);
@@ -194,7 +208,8 @@ export default function StyleCapture({ samples, onSamplesChange, onNext }: Style
         // Remove from local state only after successful deletion
         onSamplesChange(samples.filter(s => s.id !== sampleId));
       } catch (error) {
-        console.error('Error deleting sample:', error);
+        const appError = handleError(error, 'delete_sample');
+        secureLog('Error deleting sample:', { error: appError.message });
         setError('Failed to delete sample. Please try again.');
       } finally {
         setDeletingId(null);
