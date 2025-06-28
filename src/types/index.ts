@@ -49,6 +49,10 @@ export interface User {
   subscription_expires_at?: Date;
   billing_start_date?: Date; // NEW: When paid subscription billing started
   created_at: Date;
+  is_admin?: boolean; // NEW: Admin status
+  admin_notes?: string; // NEW: Admin management notes
+  admin_granted_at?: Date; // NEW: When admin access was granted
+  admin_granted_by?: string; // NEW: Who granted admin access
 }
 
 export interface PricingTier {

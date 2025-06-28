@@ -163,6 +163,7 @@ export const useAuth = () => {
           last_token_reset: new Date().toISOString().split('T')[0],
           monthly_reset_date: new Date().getDate(),
           billing_start_date: null, // No billing for free users
+          is_admin: false, // NEW: Default to non-admin
         };
 
         const { data: createdUser, error: createError } = await supabase
@@ -791,6 +792,25 @@ export const useAuth = () => {
     }
   }, [user]);
 
+  // NEW: Check if user is admin
+  const isAdmin = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      const { data, error } = await supabase.rpc('is_user_admin', { p_user_id: user.id });
+      
+      if (error) {
+        secureLog('Error checking admin status:', { error: error.message });
+        return false;
+      }
+      
+      return data || false;
+    } catch (error) {
+      secureLog('Exception checking admin status:', { error });
+      return false;
+    }
+  }, [user]);
+
   return {
     user,
     loading,
@@ -800,5 +820,6 @@ export const useAuth = () => {
     updateTokens,
     updateExports,
     saveRewriteHistory,
+    isAdmin, // NEW: Expose admin check function
   };
 };

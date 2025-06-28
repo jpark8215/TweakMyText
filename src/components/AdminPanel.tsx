@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Shield, Crown, Star, Check, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Crown, Star, Check, AlertTriangle, Lock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -11,9 +11,70 @@ interface AdminPanelProps {
 export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const { user } = useAuth();
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const { user, isAdmin } = useAuth();
+
+  // Check admin status when panel opens
+  useEffect(() => {
+    if (isOpen && user) {
+      checkAdminStatus();
+    }
+  }, [isOpen, user]);
+
+  const checkAdminStatus = async () => {
+    setCheckingAdmin(true);
+    try {
+      const adminStatus = await isAdmin();
+      setIsAdminUser(adminStatus);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdminUser(false);
+    } finally {
+      setCheckingAdmin(false);
+    }
+  };
 
   if (!isOpen || !user) return null;
+
+  // Show loading while checking admin status
+  if (checkingAdmin) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-md shadow-2xl">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Checking admin permissions...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if not admin
+  if (!isAdminUser) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-md shadow-2xl">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-8 h-8 text-red-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-6">
+              You don't have admin privileges to access this panel.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleTierChange = async (newTier: 'free' | 'pro' | 'premium') => {
     if (!user || isUpdating) return;
@@ -41,9 +102,9 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
           p_amount: amount,
           p_currency: 'USD',
           p_status: 'paid',
-          p_description: `${newTier.charAt(0).toUpperCase() + newTier.slice(1)} Monthly Subscription (Test)`,
+          p_description: `${newTier.charAt(0).toUpperCase() + newTier.slice(1)} Monthly Subscription (Admin Test)`,
           p_subscription_tier: newTier,
-          p_stripe_payment_id: `test_${Date.now()}`
+          p_stripe_payment_id: `admin_test_${Date.now()}`
         });
 
         if (billingError) {
@@ -117,6 +178,19 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
           </button>
         </div>
 
+        {/* Admin Status Banner */}
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+          <div className="flex items-center gap-3">
+            <Shield className="w-5 h-5 text-green-600" />
+            <div>
+              <h3 className="text-green-800 font-medium">Admin Access Verified</h3>
+              <p className="text-green-700 text-sm">
+                You have admin privileges. Current user tier: <strong>{user.subscription_tier}</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Warning Banner */}
         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
           <div className="flex items-center gap-3">
@@ -125,7 +199,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
               <h3 className="text-amber-800 font-medium">Testing Mode Active</h3>
               <p className="text-amber-700 text-sm">
                 This panel bypasses payment processing for testing purposes. 
-                Current tier: <strong>{user.subscription_tier}</strong>
+                All actions are logged in the admin audit trail.
               </p>
             </div>
           </div>
@@ -218,14 +292,23 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
         </div>
 
         <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <h3 className="text-blue-800 font-medium mb-2">Testing Instructions</h3>
+          <h3 className="text-blue-800 font-medium mb-2">Admin Testing Instructions</h3>
           <ul className="text-blue-700 text-sm space-y-1">
             <li>• Switch between tiers to test different feature sets</li>
             <li>• All tier changes are immediate and bypass payment</li>
             <li>• Billing records are created for testing subscription management</li>
             <li>• Page will refresh automatically after tier change</li>
+            <li>• All admin actions are logged in the audit trail</li>
             <li>• Use this panel to test upgrade flows and feature restrictions</li>
           </ul>
+        </div>
+
+        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <h3 className="text-red-800 font-medium mb-2">Security Notice</h3>
+          <p className="text-red-700 text-sm">
+            This admin panel is only accessible to users with admin privileges. 
+            All actions performed here are logged and audited for security purposes.
+          </p>
         </div>
       </div>
     </div>
