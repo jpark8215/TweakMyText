@@ -76,20 +76,30 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     setPasswordChangeStatus('loading');
     setPasswordChangeError('');
 
-    // Set a timeout to prevent infinite updating
-    const timeoutId = setTimeout(() => {
-      console.log('Password update timeout reached');
-      setIsUpdating(false);
-      setPasswordChangeStatus('error');
-      setPasswordChangeError('Password update timed out. Please try again.');
-      logPasswordChangeAttempt(false, 'Timeout after 30 seconds');
-    }, 30000); // 30 second timeout
+    // Create an AbortController to handle cancellation
+    const abortController = new AbortController();
+    let timeoutId: NodeJS.Timeout | null = null;
+    let updateCompleted = false;
 
     try {
       console.log('Checking current session...');
       
+      // Set a timeout that can be cancelled
+      timeoutId = setTimeout(() => {
+        if (!updateCompleted) {
+          console.log('Password update timeout reached');
+          abortController.abort();
+          setPasswordChangeStatus('error');
+          setPasswordChangeError('Password update timed out. Please try again.');
+          logPasswordChangeAttempt(false, 'Timeout after 30 seconds');
+          setIsUpdating(false);
+        }
+      }, 30000); // 30 second timeout
+
       // Get current session with better error handling
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (abortController.signal.aborted) return;
       
       if (sessionError) {
         console.error('Session error:', sessionError);
@@ -103,19 +113,29 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
 
       console.log('Valid session found, updating password...');
       
-      // Update password with better error handling
-      const { data, error: updateError } = await supabase.auth.updateUser({
+      // Update password with abort signal
+      const updatePromise = supabase.auth.updateUser({
         password: newPassword
       });
+
+      const { data, error: updateError } = await updatePromise;
+
+      // Mark update as completed to prevent timeout
+      updateCompleted = true;
+      
+      // Clear timeout since we got a response
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (abortController.signal.aborted) return;
 
       console.log('Password update result:', { 
         success: !updateError, 
         error: updateError?.message,
         data: !!data 
       });
-
-      // Clear timeout since we got a response
-      clearTimeout(timeoutId);
 
       if (updateError) {
         console.error('Password update failed:', updateError);
@@ -162,10 +182,20 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
         setMessage(null);
       }
     } catch (error: any) {
-      console.error('Password update exception:', error);
+      updateCompleted = true;
       
       // Clear timeout
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      
+      if (abortController.signal.aborted) {
+        console.log('Password update was aborted due to timeout');
+        return;
+      }
+      
+      console.error('Password update exception:', error);
       
       // Handle different types of errors with better messaging
       let errorMessage = 'An unexpected error occurred. ';
@@ -188,6 +218,11 @@ export default function SettingsModal({ isOpen, onClose, onManageSubscription }:
     } finally {
       console.log('Password update process completed');
       setIsUpdating(false);
+      
+      // Ensure timeout is cleared
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   };
 
