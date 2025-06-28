@@ -187,21 +187,30 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
   const handleExport = async () => {
     if (!result || !user) return;
     
+    console.log('Export attempt:', {
+      userTier: user.subscription_tier,
+      currentExports: user.monthly_exports_used,
+      hasResult: !!result
+    });
+    
     try {
-      // Check export limits
+      // Check export limits for all tiers (including premium for logging)
       if (user.subscription_tier === 'free') {
         const monthlyExportsUsed = user.monthly_exports_used || 0;
+        console.log('Free tier export check:', { monthlyExportsUsed, limit: 5 });
         if (monthlyExportsUsed >= 5) {
           alert('You have reached your monthly export limit of 5. Upgrade to Pro or Premium for more exports.');
           return;
         }
       } else if (user.subscription_tier === 'pro') {
         const monthlyExportsUsed = user.monthly_exports_used || 0;
+        console.log('Pro tier export check:', { monthlyExportsUsed, limit: 200 });
         if (monthlyExportsUsed >= 200) {
           alert('You have reached your monthly export limit of 200. Upgrade to Premium for unlimited exports.');
           return;
         }
       }
+      // Premium users have unlimited exports, no check needed
       
       const exportData = {
         original: result.original,
@@ -225,12 +234,15 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
       a.click();
       URL.revokeObjectURL(url);
 
-      // Update export count
-      if (user.subscription_tier !== 'premium') {
-        const { error } = await updateExports(1);
-        if (error) {
-          console.error('Failed to update export count:', error);
-        }
+      console.log('Export file created, now updating export count...');
+
+      // Update export count for all tiers (Premium will be handled in updateExports)
+      const { error } = await updateExports(1);
+      if (error) {
+        console.error('Failed to update export count:', error);
+        // Don't show error to user since export was successful
+      } else {
+        console.log('Export count updated successfully');
       }
     } catch (error) {
       console.error('Export failed:', error);
@@ -242,10 +254,7 @@ export default function TextRewriter({ samples, onBack, onOpenPricing }: TextRew
     (user.subscription_tier !== 'free' || (user.daily_tokens_used < 100000 && user.monthly_tokens_used < 1000000)) &&
     user.monthly_tokens_used < limits.monthlyLimit;
 
-  const canExport = user && result && 
-    (user.subscription_tier === 'premium' || 
-     (user.subscription_tier === 'pro' && (user.monthly_exports_used || 0) < 200) ||
-     (user.subscription_tier === 'free' && (user.monthly_exports_used || 0) < 5));
+  const canExport = user && result;
 
   const getTimeUntilReset = () => {
     const now = new Date();

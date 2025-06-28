@@ -539,7 +539,11 @@ export const useAuth = () => {
   const updateExports = async (exportsUsed: number) => {
     if (!user) return { error: new Error('No user found') };
 
-    console.log('Updating exports:', { exportsUsed, currentExports: user.monthly_exports_used });
+    console.log('Updating exports:', { 
+      exportsUsed, 
+      currentExports: user.monthly_exports_used,
+      subscriptionTier: user.subscription_tier 
+    });
 
     // Log export attempt
     await logSecurityEvent({
@@ -566,6 +570,7 @@ export const useAuth = () => {
 
     // Check if unlimited exports (Premium)
     if (limits.monthlyLimit === -1) {
+      console.log('Premium user - unlimited exports');
       await logSecurityEvent({
         userId: user.id,
         action: 'export_unlimited',
@@ -576,9 +581,18 @@ export const useAuth = () => {
       return { error: null };
     }
 
-    const newExportsUsed = (user.monthly_exports_used || 0) + exportsUsed;
+    const currentExportsUsed = user.monthly_exports_used || 0;
+    const newExportsUsed = currentExportsUsed + exportsUsed;
     
+    console.log('Export limit check:', {
+      currentExportsUsed,
+      newExportsUsed,
+      monthlyLimit: limits.monthlyLimit,
+      willExceed: newExportsUsed > limits.monthlyLimit
+    });
+
     if (newExportsUsed > limits.monthlyLimit) {
+      console.log('Export limit exceeded');
       await logSecurityEvent({
         userId: user.id,
         action: 'export_limit_exceeded',
@@ -591,12 +605,17 @@ export const useAuth = () => {
     }
 
     try {
+      console.log('Updating database with new export count:', newExportsUsed);
+      
       const { error } = await supabase
         .from('users')
         .update({ monthly_exports_used: newExportsUsed })
         .eq('id', user.id);
 
       if (!error) {
+        console.log('Export count updated successfully in database');
+        
+        // Update local user state
         setUser({ ...user, monthly_exports_used: newExportsUsed });
         
         // Log successful export
@@ -607,6 +626,8 @@ export const useAuth = () => {
           allowed: true,
           subscriptionTier: user.subscription_tier,
         });
+        
+        console.log('Local user state updated with new export count');
       } else {
         console.error('Export update error:', error);
         // Log export error
