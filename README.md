@@ -4,7 +4,7 @@
 
 The inspiration for **TweakMyText** came from a personal frustration I experienced while working across different professional contexts. I noticed how challenging it was to maintain a consistent, authentic voice when writing emails to colleagues, creating content for different audiences, or adapting academic writing for various purposes.
 
-Existing AI writing tools felt generic and impersonal — they could make text formal or casual, but they couldn't capture the unique quirks, patterns, and personality that make someone's writing distinctly theirs. I realized there was a gap in the market for a tool that could learn from your actual writing samples and transform any text to match your authentic voice.
+Existing AI writing tools felt generic and impersonal. They could make text formal or casual, but they couldn't capture the unique quirks, patterns, and personality that make someone's writing distinctly theirs. I realized there was a gap in the market for a tool that could learn from your actual writing samples and transform any text to match your authentic voice.
 
 The "aha moment" came when I thought: **What if AI could write like YOU specifically?** Not just following general style guidelines, but actually understanding and replicating your personal writing patterns, tone preferences, and communication style. This led to the core concept of a writing style matcher that learns from user-provided samples.
 
