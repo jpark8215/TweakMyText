@@ -18,35 +18,23 @@ const ToneControls = memo(({ settings, onChange, onClose, onOpenPricing }: ToneC
   const handleSliderChange = useCallback((key: keyof ToneSettings, value: number) => {
     // Check if user has permission to modify tone settings
     if (!limits.canModifyTone) {
-      // For free users, show upgrade message but don't prevent the change
-      // The validation will happen in the rewrite function
-      if (onOpenPricing) {
-        onOpenPricing();
-      }
-      return;
+      return; // Free users cannot modify tone settings
     }
     
     // Check if this specific control is available for the user's tier
     if (!limits.availableToneControls.includes(key)) {
-      // For Pro users trying to use Premium controls, show upgrade message
-      if (onOpenPricing) {
-        onOpenPricing();
-      }
-      return;
+      return; // Control not available for this tier
     }
     
     onChange({
       ...settings,
       [key]: value
     });
-  }, [settings, onChange, limits, onOpenPricing]);
+  }, [settings, onChange, limits]);
 
   const resetToDefaults = useCallback(() => {
     if (!limits.canModifyTone) {
-      if (onOpenPricing) {
-        onOpenPricing();
-      }
-      return;
+      return; // Free users cannot reset tone settings
     }
     
     const defaultSettings: ToneSettings = { 
@@ -69,7 +57,7 @@ const ToneControls = memo(({ settings, onChange, onClose, onOpenPricing }: ToneC
     });
     
     onChange(resetSettings);
-  }, [settings, onChange, limits, onOpenPricing]);
+  }, [settings, onChange, limits]);
 
   const handleUpgradeClick = useCallback(() => {
     onOpenPricing?.();
@@ -92,10 +80,7 @@ const ToneControls = memo(({ settings, onChange, onClose, onOpenPricing }: ToneC
 
   const applyPreset = useCallback((preset: typeof presets[0]) => {
     if (!limits.canUsePresets) {
-      if (onOpenPricing) {
-        onOpenPricing();
-      }
-      return;
+      return; // Only Pro/Premium users can apply presets
     }
     
     // Only apply values for controls available to the user's tier
@@ -107,14 +92,11 @@ const ToneControls = memo(({ settings, onChange, onClose, onOpenPricing }: ToneC
     });
     
     onChange(newSettings);
-  }, [settings, onChange, limits, onOpenPricing]);
+  }, [settings, onChange, limits]);
 
   const applyAdvancedPreset = useCallback((preset: typeof advancedPresets[0]) => {
     if (!limits.canUseAdvancedPresets) {
-      if (onOpenPricing) {
-        onOpenPricing();
-      }
-      return;
+      return; // Only Premium users can apply advanced presets
     }
     
     // Apply all values since Premium users have access to all controls
@@ -124,7 +106,7 @@ const ToneControls = memo(({ settings, onChange, onClose, onOpenPricing }: ToneC
     });
     
     onChange(newSettings);
-  }, [settings, onChange, limits, onOpenPricing]);
+  }, [settings, onChange, limits]);
 
   const allSliders = useMemo(() => [
     {
